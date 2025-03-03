@@ -11,9 +11,6 @@ local env = {
     -- 服务端令牌，防止第三方上报垃圾数据或非法获取数据，需要与服务器端相同
     serverToken = "3d4ed77e60b1aac9c7e4ca7f3a5cb47b",
 
-    -- ME控制器或ME接口地址
-    aeAddress = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-
     -- 分块上报时每块的大小
     chunkSize = 256,
 

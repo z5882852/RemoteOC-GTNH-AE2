@@ -4,17 +4,12 @@ local env = require("env")
 
 local aeAddress = env.aeAddress
 
-local me
-
-if component.proxy(aeAddress) then
-    me = component.proxy(aeAddress)
-elseif component.isAvailable("me_controller") then
-    me = component.me_controller
-elseif component.isAvailable("me_interface") then
-    me = component.me_interface
-else
-    error("未找到 AE 网络")
+if not component.isAvailable("me_interface") then
+  io.stderr:write("请将ME接口贴着适配器\n")
+  return
 end
+
+local me = component.me_interface
 
 ae = {}
 
