@@ -239,13 +239,20 @@ function ae.getAllCraftables()
 
     local result = {}
     for _, item in pairs(items) do
-        if item.isCraftable then
-            table.insert(result, {
-                name = item.name,
-                label = item.label,
-                size = item.size,
-                damage = item.damage
-            })
+    if item.isCraftable then
+        local entry = {
+            name = item.name,
+            label = item.label,
+            size = item.size,
+            damage = item.damage
+        }
+        
+        if item.hasTag then
+            entry.hasTag = true
+            entry.tag = base64.encode(item.tag)
+        end
+        
+        table.insert(result, entry)
         end
     end
 
