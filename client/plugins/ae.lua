@@ -231,6 +231,18 @@ function ae.getAllItems(filter)
     return { message = "success", data = parseItem(items) }
 end
 
+function ae.getAllFluids()
+    -- 获取所有流体信息
+    local fluids = me.getFluidsInNetwork()
+    return { message = "success", data = parseItem(fluids) }
+end
+
+function ae.getAllEssentia()
+    -- 获取所有源质信息
+    local essentia = me.getEssentiaInNetwork()
+    return { message = "success", data = parseItem(essentia) }
+end
+
 function ae.getAllCraftables()
     -- 获取所有可合成的物品
 
