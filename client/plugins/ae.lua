@@ -23,7 +23,7 @@ local function parseItem(items)
     if items == nil then return nil end
     local data = {}
     for i, item in pairs(items) do
-        if item.hasTag then
+        if item.hasTag and item.tag ~= nil then
             item.tag = base64.encode(item.tag)
         end
         table.insert(data, item)
@@ -247,7 +247,7 @@ function ae.getAllCraftables()
             damage = item.damage
         }
         
-        if item.hasTag then
+        if item.hasTag and item.tag ~= nil then
             entry.hasTag = true
             entry.tag = base64.encode(item.tag)
         end
