@@ -230,7 +230,7 @@
                                     </el-form-item>
                                 </template>
 
-                                <template v-if="form.action === 'notify'">
+                                <template v-if="form.action === 'http_request'">
                                     <el-form-item label="请求方法" :required="true">
                                         <el-select v-model="options.action_kwargs.method" placeholder="请选择请求方法">
                                             <el-option label="GET" value="GET" />
@@ -449,7 +449,7 @@ export default {
                     return;
                 }
             }
-            if (this.form.action === 'notify') {
+            if (this.form.action === 'http_request') {
                 if (this.options.action_kwargs.data) {
                     try {
                         this.form.action_kwargs.data = JSON.parse(this.options.action_kwargs.data);

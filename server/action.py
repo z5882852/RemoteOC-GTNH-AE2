@@ -33,11 +33,11 @@ def craft_item(client_id, item_name, item_damage, item_amount=1, cpu_name=None, 
     return task_id
 
 
-def send_notification(method: str, url: str, headers=None, params=None, data=None):
+def send_http_request(method: str, url: str, headers=None, params=None, data=None):
     """
-    发送通知
+    发送http请求
 
-    通过请求url发送通知
+    向指定的URL发送HTTP请求，并返回响应内容。
     :param method: 请求方法
     :param url: 请求地址
     :param headers: 请求头
