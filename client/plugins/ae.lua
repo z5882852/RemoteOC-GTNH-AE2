@@ -23,7 +23,7 @@ local function parseItem(items)
     if items == nil then return nil end
     local data = {}
     for i, item in pairs(items) do
-        if item.hasTag then
+        if item.hasTag and item.tag ~= nil then
             item.tag = base64.encode(item.tag)
         end
         table.insert(data, item)
@@ -231,6 +231,18 @@ function ae.getAllItems(filter)
     return { message = "success", data = parseItem(items) }
 end
 
+function ae.getAllFluids()
+    -- 获取所有流体信息
+    local fluids = me.getFluidsInNetwork()
+    return { message = "success", data = parseItem(fluids) }
+end
+
+function ae.getAllEssentia()
+    -- 获取所有源质信息
+    local essentia = me.getEssentiaInNetwork()
+    return { message = "success", data = parseItem(essentia) }
+end
+
 function ae.getAllCraftables()
     -- 获取所有可合成的物品
 
@@ -247,7 +259,7 @@ function ae.getAllCraftables()
             damage = item.damage
         }
         
-        if item.hasTag then
+        if item.hasTag and item.tag ~= nil then
             entry.hasTag = true
             entry.tag = base64.encode(item.tag)
         end
