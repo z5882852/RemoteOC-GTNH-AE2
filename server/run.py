@@ -11,7 +11,7 @@ from config import task_config
 def parse_args():
     parser = argparse.ArgumentParser(description="启动 RemoteOC 服务端")
     parser.add_argument("--host", "-H", default="0.0.0.0", help="服务器监听的主机地址，默认 0.0.0.0")
-    parser.add_argument("--port", "-P", type=int, default=8080, help="服务器监听的端口，默认 1030")
+    parser.add_argument("--port", "-P", type=int, default=8080, help="服务器监听的端口，默认 8080")
     
     # 解析参数
     return parser.parse_args()

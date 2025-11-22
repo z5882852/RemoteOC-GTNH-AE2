@@ -168,10 +168,10 @@ trigger_config = {
                     },
                 ],
             },
-            "notify": {
-                "name": "发送通知",
-                "description": "发送HTTP请求推送API，通知用户",
-                "function": send_notification,
+            "http_request": {
+                "name": "发送 HTTP 请求",
+                "description": "向指定地址发送 HTTP 请求",
+                "function": send_http_request,
                 "args": [
                     {
                         "field": "method",
@@ -324,10 +324,10 @@ timer_config = {
 # action模板
 action_template = {
     "CPU空闲时": {
-        "notify": [
+        "http_request": [
             {
-                "name": "发送QQ群通知",
-                "description": "发送QQ群通知，需要在环境变量中配置参数",
+                "name": "发送群消息",
+                "description": "使用OneBot v11协议，发送群消息，需要在环境变量中配置参数",
                 "action_kwargs": {
                     "method": "POST",
                     "url": "http://<ONEBOT_SERVER_ADDRESS>/send_group_msg",

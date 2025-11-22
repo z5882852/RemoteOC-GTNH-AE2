@@ -230,7 +230,7 @@
                                     </el-form-item>
                                 </template>
 
-                                <template v-if="form.action === 'notify'">
+                                <template v-if="form.action === 'http_request'">
                                     <el-form-item label="请求方法" :required="true">
                                         <el-select v-model="options.action_kwargs.method" placeholder="请选择请求方法">
                                             <el-option label="GET" value="GET" />
@@ -313,6 +313,7 @@ import TaskResult from "@/components/TaskResult.vue";
 import CpuSelect from "@/components/CpuSelect.vue";
 import ItemSelect from "@/components/ItemSelect.vue";
 import { ElMessage, ElTag, ElButton } from 'element-plus'
+import Setting from '@/utils/setting';
 
 const statusMap = {
     "ready": {
@@ -339,6 +340,7 @@ export default {
     },
     data() {
         return {
+            backendUrl: Setting.get('backendUrl'),
             statusMap,
             tasks: [],
             lastUpdate: "",
@@ -383,47 +385,58 @@ export default {
         };
     },
     methods: {
-        loadAutoTasks() {
-            this.mainLoading = true;
+        async loadAutoTasks() {
+            if (!this.backendUrl) {
+                this.$message.warning('后端地址未配置');
+                return;
+            }
 
-            Promise.all([
-                new Promise((resolve) => {
-                    trigger.getTriggerList((data) => {
-                        let triggers = [];
-                        for (let key in data) {
-                            data[key].id = key;
-                            data[key].type = "触发器";
-                            triggers.push(data[key]);
-                        }
-                        resolve(triggers);
-                    });
-                }),
-                new Promise((resolve) => {
-                    timer.getTimerList((data) => {
-                        let timers = [];
-                        for (let key in data) {
-                            data[key].id = key;
-                            data[key].type = "定时器";
-                            timers.push(data[key]);
-                        }
-                        resolve(timers);
-                    });
-                })
-            ])
-                .then(([triggers, timers]) => {
-                    this.tasks = [...triggers, ...timers];
-                    this.mainLoading = false;
-                    this.lastUpdate = new Date().toLocaleString().replace(/\//g, '-');
-                    this.tasks.sort((a, b) => {
-                        return new Date(b.time.created) - new Date(a.time.created);
-                    });
-                    this.tasks.reverse();
-                })
-                .catch((error) => {
-                    this.mainLoading = false;
-                    ElMessage.error(`加载任务失败: ${error}`);
-                    console.error('Error loading tasks:', error);
+            this.mainLoading = true;
+            this.lastUpdate = '';
+
+            try {
+                const [triggers, timers] = await Promise.all([
+                    new Promise((resolve, reject) => {
+                        trigger.getTriggerList((data) => {
+                            if (!data) {
+                                reject(new Error('获取触发器列表失败'));
+                                return;
+                            }
+                            const triggerList = Object.entries(data).map(([key, value]) => ({
+                                ...value,
+                                id: key,
+                                type: "触发器"
+                            }));
+                            resolve(triggerList);
+                        });
+                    }),
+                    new Promise((resolve, reject) => {
+                        timer.getTimerList((data) => {
+                            if (!data) {
+                                reject(new Error('获取定时器列表失败'));
+                                return;
+                            }
+                            const timerList = Object.entries(data).map(([key, value]) => ({
+                                ...value,
+                                id: key,
+                                type: "定时器"
+                            }));
+                            resolve(timerList);
+                        });
+                    })
+                ]);
+
+                this.tasks = [...triggers, ...timers].sort((a, b) => {
+                    return new Date(a.time.created) - new Date(b.time.created);
                 });
+                this.lastUpdate = new Date().toLocaleString().replace(/\//g, '-');
+            } catch (error) {
+                ElMessage.error(`加载任务失败: ${error.message || error}`);
+                console.error('Error loading tasks:', error);
+                this.tasks = [];
+            } finally {
+                this.mainLoading = false;
+            }
         },
         showAutoTaskDialog() {
             this.showAddTaskDialog = true;
@@ -431,60 +444,144 @@ export default {
             this.fetchActionTemplates();
         },
         addAutoTask() {
+            // 基本验证
             if (!this.form.name || !this.form.action) {
-                ElMessage.error('请填写完整信息');
+                ElMessage.error('请填写完整的触发条件和执行操作');
                 return;
             }
-            if (this.form.name === 'CPU空闲时' && !this.form.trigger_kwargs.cpu_name) {
-                ElMessage.error('请选择监听的CPU');
-                return;
+
+            // 各类型特定验证
+            if (this.form.name === 'CPU空闲时') {
+                if (!this.form.trigger_kwargs.cpu_name) {
+                    ElMessage.error('请选择监听的CPU');
+                    return;
+                }
+                if (!this.form.interval || this.form.interval < 1) {
+                    ElMessage.error('请设置有效的检测间隔（至少1秒）');
+                    return;
+                }
             }
+
+            if (this.form.name === '延迟任务') {
+                if (!this.form.trigger_kwargs.delay || this.form.trigger_kwargs.delay < 60) {
+                    ElMessage.error('延迟时间至少需要60秒');
+                    return;
+                }
+            }
+
+            if (this.form.name === '定时任务') {
+                if (!this.form.trigger_kwargs.time) {
+                    ElMessage.error('请选择定时时间');
+                    return;
+                }
+                const selectedTime = new Date(this.form.trigger_kwargs.time);
+                const now = new Date();
+                if (selectedTime <= now) {
+                    ElMessage.warning('定时时间应该是未来的时间');
+                    return;
+                }
+            }
+
+            // 执行操作相关验证
             if (this.form.action === 'craft') {
                 if (!this.form.action_kwargs.item_name) {
                     ElMessage.error('请选择合成物品');
                     return;
                 }
-                if (!this.form.action_kwargs.item_amount) {
-                    ElMessage.error('请填写合成数量');
+                if (!this.form.action_kwargs.item_amount || this.form.action_kwargs.item_amount < 1) {
+                    ElMessage.error('请填写有效的合成数量（至少1个）');
                     return;
                 }
             }
-            if (this.form.action === 'notify') {
-                if (this.options.action_kwargs.data) {
+
+            if (this.form.action === 'http_request') {
+                // 验证JSON数据
+                if (this.options.action_kwargs.data && this.options.action_kwargs.data.trim()) {
                     try {
                         this.form.action_kwargs.data = JSON.parse(this.options.action_kwargs.data);
                     } catch (error) {
-                        ElMessage.error('请求体必须是 JSON 格式');
+                        ElMessage.error('请求体必须是有效的JSON格式');
                         console.error('Error parsing JSON:', error);
                         return;
                     }
                 }
+
+                // 处理请求头
                 if (this.options.key_value_group.headers && this.options.key_value_group.headers.length) {
-                    let headers = {};
+                    const headers = {};
+                    const invalidHeaders = [];
+
                     this.options.key_value_group.headers.forEach(item => {
-                        if (item.key && item.value) {
-                            headers[item.key] = item.value;
+                        if (item.key && item.key.trim() && item.value !== undefined) {
+                            headers[item.key.trim()] = item.value;
+                        } else if (item.key || item.value) {
+                            invalidHeaders.push(item);
                         }
                     });
-                    this.form.action_kwargs.headers = headers;
+
+                    if (invalidHeaders.length > 0) {
+                        ElMessage.warning(`发现 ${invalidHeaders.length} 个无效的请求头（键或值为空）`);
+                    }
+
+                    if (Object.keys(headers).length > 0) {
+                        this.form.action_kwargs.headers = headers;
+                    }
                 }
+
+                // 处理URL参数
                 if (this.options.key_value_group.params && this.options.key_value_group.params.length) {
-                    let params = {};
+                    const params = {};
+                    const invalidParams = [];
+
                     this.options.key_value_group.params.forEach(item => {
-                        if (item.key && item.value) {
-                            params[item.key] = item.value;
+                        if (item.key && item.key.trim() && item.value !== undefined) {
+                            params[item.key.trim()] = item.value;
+                        } else if (item.key || item.value) {
+                            invalidParams.push(item);
                         }
                     });
-                    this.form.action_kwargs.params = params;
+
+                    if (invalidParams.length > 0) {
+                        ElMessage.warning(`发现 ${invalidParams.length} 个无效的URL参数（键或值为空）`);
+                    }
+
+                    if (Object.keys(params).length > 0) {
+                        this.form.action_kwargs.params = params;
+                    }
                 }
-                if (!this.options.action_kwargs.url || !this.options.action_kwargs.method) {
-                    ElMessage.error('请求地址和方法不能为空');
+
+                // 必填字段验证
+                if (!this.options.action_kwargs.url) {
+                    ElMessage.error('请求地址不能为空');
                     return;
                 }
+
+                if (!this.options.action_kwargs.method) {
+                    ElMessage.error('请求方法不能为空');
+                    return;
+                }
+
+                // 验证URL格式
+                try {
+                    new URL(this.options.action_kwargs.url);
+                } catch (e) {
+                    ElMessage.warning('请求地址格式可能不正确，请确认');
+                }
+
                 this.form.action_kwargs.method = this.options.action_kwargs.method;
                 this.form.action_kwargs.url = this.options.action_kwargs.url;
             }
-            let type = this.config.find(item => item.name === this.form.name).type;
+
+            // 查找触发器类型
+            const configItem = this.config.find(item => item.name === this.form.name);
+            if (!configItem) {
+                ElMessage.error('无效的触发条件');
+                return;
+            }
+
+            // 提交任务
+            const type = configItem.type;
+            ElMessage.info('正在添加任务，请稍候...');
             this.submitTask(type, this.form);
         },
         submitTask(type, form) {
@@ -504,81 +601,125 @@ export default {
         },
         fetchAutoTaskConfig() {
             Promise.all([
-                new Promise((resolve) => {
+                new Promise((resolve, reject) => {
                     trigger.getTriggerConfig((data) => {
-                        data.forEach(item => item.type = '触发器');
-                        resolve(data);
+                        if (!data) {
+                            reject(new Error('无法获取触发器配置'));
+                            return;
+                        }
+                        const triggerConfig = data.map(item => ({ ...item, type: '触发器' }));
+                        resolve(triggerConfig);
                     });
                 }),
-                new Promise((resolve) => {
+                new Promise((resolve, reject) => {
                     timer.getTimerConfig((data) => {
-                        data.forEach(item => item.type = '定时器');
-                        resolve(data);
+                        if (!data) {
+                            reject(new Error('无法获取定时器配置'));
+                            return;
+                        }
+                        const timerConfig = data.map(item => ({ ...item, type: '定时器' }));
+                        resolve(timerConfig);
                     });
                 })
             ])
-                .then(([triggerConfig, timerConfig]) => {
-                    this.config = [...triggerConfig, ...timerConfig];
-                    this.options.name = [
-                        {
-                            label: '触发器',
-                            options: triggerConfig.map(item => ({ label: item.name, value: item.name, desc: item.description }))
-                        }, {
-                            label: '定时器',
-                            options: timerConfig.map(item => ({ label: item.name, value: item.name, desc: item.description }))
-                        }
-                    ];
+            .then(([triggerConfig, timerConfig]) => {
+                this.config = [...triggerConfig, ...timerConfig];
+                
+                // 整理选项列表
+                this.options.name = [
+                    {
+                        label: '触发器',
+                        options: triggerConfig.map(item => ({ 
+                            label: item.name, 
+                            value: item.name, 
+                            desc: item.description 
+                        }))
+                    }, 
+                    {
+                        label: '定时器',
+                        options: timerConfig.map(item => ({ 
+                            label: item.name, 
+                            value: item.name, 
+                            desc: item.description 
+                        }))
+                    }
+                ];
 
-                    this.args.trigger = {};
-                    this.args.action = {};
-                    this.config.forEach(item => {
-                        this.args.trigger[item.name] = {};
-                        this.args.action[item.name] = {};
+                // 预处理默认参数
+                this.args.trigger = {};
+                this.args.action = {};
+                
+                this.config.forEach(item => {
+                    // 存储触发器默认参数
+                    this.args.trigger[item.name] = {};
+                    if (item.args && Array.isArray(item.args)) {
                         item.args.forEach(arg => {
                             if (arg.default !== undefined && arg.default !== null) {
                                 this.args.trigger[item.name][arg.field] = arg.default;
                             }
                         });
+                    }
+                    
+                    // 存储操作默认参数
+                    this.args.action[item.name] = {};
+                    if (item.actions && Array.isArray(item.actions)) {
                         item.actions.forEach(action => {
                             this.args.action[item.name][action.id] = {};
-                            action.args.forEach(arg => {
-                                if (arg.default !== undefined && arg.default !== null) {
-                                    this.args.action[item.name][action.id][arg.field] = arg.default;
-                                }
-                            });
+                            if (action.args && Array.isArray(action.args)) {
+                                action.args.forEach(arg => {
+                                    if (arg.default !== undefined && arg.default !== null) {
+                                        this.args.action[item.name][action.id][arg.field] = arg.default;
+                                    }
+                                });
+                            }
                         });
-                    });
-                })
-                .catch((error) => {
-                    ElMessage.error(`加载任务配置失败: ${error}`);
-                    console.error('Error loading task config:', error);
+                    }
                 });
+            })
+            .catch((error) => {
+                ElMessage.error(`加载任务配置失败: ${error.message || error}`);
+                console.error('Error loading task config:', error);
+            });
         },
         fetchActionTemplates() {
             getActionTemplats((data) => {
+                if (!data) {
+                    ElMessage.warning('获取模板数据失败');
+                    return;
+                }
+                
                 this.options.action_templates.data = data;
-                let options = [];
-                for (let trigger_name in data) {
-                    for (let action_name in data[trigger_name]) {
-                        options.push({
-                            trigger_name,
-                            action_name,
-                            template_name: action_name,
-                            description: data[trigger_name][action_name].description,
-                        });
+                
+                // 转换模板数据为选项列表
+                const options = [];
+                for (const trigger_name in data) {
+                    for (const action_name in data[trigger_name]) {
+                        if (data[trigger_name][action_name]) {
+                            options.push({
+                                trigger_name,
+                                action_name,
+                                template_name: action_name,
+                                description: data[trigger_name][action_name].description || '无描述',
+                                name: action_name
+                            });
+                        }
                     }
                 }
+                
+                this.options.action_templates.options = options;
             });
-
-
         },
         handleStart(data) {
+            if (!data || !data.id) {
+                ElMessage.error('任务数据无效');
+                return;
+            }
+            
             if (data.type === '定时器') {
                 timer.startTimer(data.id, (res) => {
                     ElMessage.success('任务启动成功');
                     this.loadAutoTasks();
                 });
-                return;
             } else {
                 trigger.startTrigger(data.id, (res) => {
                     ElMessage.success('任务启动成功');
@@ -587,12 +728,16 @@ export default {
             }
         },
         handleStop(data) {
+            if (!data || !data.id) {
+                ElMessage.error('任务数据无效');
+                return;
+            }
+
             if (data.type === '定时器') {
                 timer.stopTimer(data.id, (res) => {
                     ElMessage.success('任务停止成功');
                     this.loadAutoTasks();
                 });
-                return;
             } else {
                 trigger.stopTrigger(data.id, (res) => {
                     ElMessage.success('任务停止成功');
@@ -601,14 +746,38 @@ export default {
             }
         },
         handleInfo(data) {
-            Object.keys(data.time).forEach(key => {
-                if (!data.time[key]) {
-                    return;
+            if (!data) {
+                ElMessage.error('任务数据无效');
+                return;
+            }
+            
+            // 安全地格式化时间
+            try {
+                const formattedData = { ...data };
+                
+                // 复制并格式化时间数据
+                if (formattedData.time) {
+                    formattedData.time = { ...formattedData.time };
+                    Object.keys(formattedData.time).forEach(key => {
+                        if (!formattedData.time[key]) {
+                            return;
+                        }
+                        try {
+                            formattedData.time[key] = new Date(formattedData.time[key])
+                                .toLocaleString()
+                                .replace(/\//g, '-');
+                        } catch (e) {
+                            console.warn(`无法格式化时间 ${key}:`, e);
+                        }
+                    });
                 }
-                data.time[key] = new Date(data.time[key]).toLocaleString().replace(/\//g, '-');
-            });
-            this.info = data;
-            this.showInfoDialog = true;
+                
+                this.info = formattedData;
+                this.showInfoDialog = true;
+            } catch (error) {
+                console.error('处理任务详情时出错:', error);
+                ElMessage.error('无法显示任务详情');
+            }
         },
         handleRemove(data) {
             if (data.type === '定时器') {
@@ -692,22 +861,52 @@ export default {
             this.options.itemList = itemList;
         },
         comfirmUseTemplate(template) {
-            let key_value_fields = template.args.key_values;
-            // 存在则将template.action_kwargs中的key_value字段添加到options.key_value_group中
-            if (key_value_fields) {
-                key_value_fields.forEach(field => {
-                    this.options.key_value_group[field] = [];
-                    let key_value_content = template.action_kwargs[field];
-                    if (key_value_content) {
-                        for (let key in key_value_content) {
-                            this.options.key_value_group[field].push({ key: key, value: key_value_content[key] });
-                        }
-                    }
-                    // 去除template.action_kwargs中的key_value字段
-                    delete template.action_kwargs[field];
-                });
+            if (!template) {
+                ElMessage.warning('无效的模板');
+                return;
             }
-            this.options.action_kwargs = template.action_kwargs;
+            
+            try {
+                // 处理键值对模板数据
+                const key_value_fields = template.args && template.args.key_values;
+                
+                // 清空现有的键值对组
+                if (this.options.key_value_group) {
+                    Object.keys(this.options.key_value_group).forEach(field => {
+                        this.options.key_value_group[field] = [];
+                    });
+                }
+                
+                // 存在则将template.action_kwargs中的key_value字段添加到options.key_value_group中
+                if (key_value_fields && Array.isArray(key_value_fields)) {
+                    key_value_fields.forEach(field => {
+                        if (!this.options.key_value_group[field]) {
+                            this.options.key_value_group[field] = [];
+                        }
+                        
+                        const key_value_content = template.action_kwargs[field];
+                        if (key_value_content) {
+                            for (const key in key_value_content) {
+                                this.options.key_value_group[field].push({ 
+                                    key: key, 
+                                    value: key_value_content[key] 
+                                });
+                            }
+                            
+                            // 去除template.action_kwargs中的key_value字段
+                            delete template.action_kwargs[field];
+                        }
+                    });
+                }
+                
+                // 复制模板参数到表单
+                this.options.action_kwargs = { ...template.action_kwargs };
+                ElMessage.success('模板应用成功');
+            } catch (error) {
+                console.error('应用模板时出错:', error);
+                ElMessage.error('应用模板失败');
+            }
+            
             this.showUseTemplateDialog = false;
         },
     },
