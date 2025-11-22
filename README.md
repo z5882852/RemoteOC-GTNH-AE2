@@ -5,7 +5,7 @@
 </p>
 
 <h1 align="center" style="font-size: 38px;">赛博监工</h1>
-<h3 align="center">AE2 Control for GTNH 2.7.0</h3>
+<h3 align="center">AE2 Control for GTNH 2.8.0</h3>
 
 
 ## 简介
