@@ -21,9 +21,9 @@
             </el-link>
         </el-descriptions-item>
         <el-descriptions-item label="接口文档">
-            <el-link :href="`${backendUrl}/docs`" target="_blank"
+            <el-link :href="backendUrl ? `${backendUrl}/docs` : '#'" target="_blank"
                 :underline="false">
-                {{ backendUrl }}/docs
+                {{ backendUrl ? `${backendUrl}/docs` : '-' }}
             </el-link>
         </el-descriptions-item>
         <el-descriptions-item label="许可信息">MIT license</el-descriptions-item>
@@ -50,7 +50,7 @@ export default {
             backendUrl: Setting.get('backendUrl'),
             version: __VERSION__,
             meta: {
-                version: "unknown",
+                version: "-",
                 device_num: 0,
             },
             client: {
@@ -70,6 +70,10 @@ export default {
     methods: {
         async getMeta() {
             try {
+                if (!this.backendUrl) {
+                    this.$message.warning('后端地址未配置');
+                    return;
+                }
                 this.loading = true;
                 const response = await Requests.get('/api/info/meta');
                 const data = response.data;
@@ -89,6 +93,10 @@ export default {
         },
         async getClients() {
             try {
+                if (!this.backendUrl) {
+                    this.$message.warning('后端地址未配置');
+                    return;
+                }
                 this.client.loading = true;
                 const response = await Requests.get('/api/info/devices');
                 const data = response.data;

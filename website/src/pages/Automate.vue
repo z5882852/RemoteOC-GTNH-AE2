@@ -313,6 +313,7 @@ import TaskResult from "@/components/TaskResult.vue";
 import CpuSelect from "@/components/CpuSelect.vue";
 import ItemSelect from "@/components/ItemSelect.vue";
 import { ElMessage, ElTag, ElButton } from 'element-plus'
+import Setting from '@/utils/setting';
 
 const statusMap = {
     "ready": {
@@ -339,6 +340,7 @@ export default {
     },
     data() {
         return {
+            backendUrl: Setting.get('backendUrl'),
             statusMap,
             tasks: [],
             lastUpdate: "",
@@ -384,6 +386,11 @@ export default {
     },
     methods: {
         async loadAutoTasks() {
+            if (!this.backendUrl) {
+                this.$message.warning('后端地址未配置');
+                return;
+            }
+
             this.mainLoading = true;
             this.lastUpdate = '';
 

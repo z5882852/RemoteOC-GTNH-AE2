@@ -1,7 +1,7 @@
 {
   "name": "remote-oc-gtnh-ae2-website",
   "private": true,
-  "version": "1.2.5",
+  "version": "1.2.6",
   "scripts": {
     "dev": "vite --port 80 --host 0.0.0.0",
     "build": "vite build",

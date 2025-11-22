@@ -99,6 +99,14 @@ export default {
             isDataLoaded: false,
             drawerVisible: false,
             showProgress: false,
+            loadError: false,
+            errorMessage: "",
+        };
+    },
+    provide() {
+        return {
+            loadError: () => this.loadError,
+            errorMessage: () => this.errorMessage,
         };
     },
     created() {
@@ -131,6 +139,10 @@ export default {
             let fluidsLoaded = false;
             this.showProgress = true;
 
+            const resourceUrl = Setting.get("resourceUrl");
+            const useGzip = Setting.get("useGzip");
+            const version = itemUtil.version.replace(/\./g, "");
+
             // 加载 items 数据
             itemUtil.loadItems((percent) => {
                 console.log(`Items JSON loading: ${percent}%`);
@@ -143,8 +155,13 @@ export default {
                         this.showProgress = false;
                     }
                 } else if (percent === -1) {
-                    ElMessage.error("加载 items 数据失败！");
+                    const itemsUrl = `${resourceUrl}/items_GTNH${version}.json${useGzip ? '.gz' : ''}`;
+                    this.errorMessage = `加载 items 数据失败，数据源：${itemsUrl}`;
+                    this.loadError = true;
+                    this.isDataLoaded = true;
                     this.loadingInstance.close();
+                    this.showProgress = false;
+                    ElMessage.error("加载 items 数据失败！");
                 }
             });
 
@@ -160,8 +177,13 @@ export default {
                         this.showProgress = false;
                     }
                 } else if (percent === -1) {
-                    ElMessage.error("加载 fluids 数据失败！");
+                    const fluidsUrl = `${resourceUrl}/fluids_GTNH${version}.json${useGzip ? '.gz' : ''}`;
+                    this.errorMessage = `加载 fluids 数据失败，数据源：${fluidsUrl}`;
+                    this.loadError = true;
+                    this.isDataLoaded = true;
                     this.loadingInstance.close();
+                    this.showProgress = false;
+                    ElMessage.error("加载 fluids 数据失败！");
                 }
             });
         },

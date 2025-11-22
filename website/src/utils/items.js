@@ -5,7 +5,7 @@ import Setting from '@/utils/setting';
 const itemUtil = {
     items: null,
     fluids: null,
-    version: "2.7.0",
+    version: "2.8.0",
 
     loadWithProgress(url, progressCallback) {
         axios.get(url, {
@@ -97,8 +97,9 @@ const itemUtil = {
                 name = name.replaceAll("|", "_");
                 if (!items[name]) return null;
             }
-            const damage = (obj["damage"] ? obj["damage"] : 0) + "";
-            return items[name][damage];
+            let damage = (obj["damage"] ? obj["damage"] : 0) + "";
+            let item = items[name][damage];
+            return item ? item : items[name]["0"];
         }
         return null;
     },
