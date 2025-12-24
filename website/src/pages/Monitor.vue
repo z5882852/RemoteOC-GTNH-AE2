@@ -80,9 +80,10 @@
 </template>
 
 <script>
-import { fetchStatus, addTask, createPollingController } from '@/utils/task'
+import { fetchHistory } from '@/utils/task'
 import { useTransition, useDark } from '@vueuse/core'
 import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
 
 export default {
     name: 'Monitor',
@@ -99,7 +100,6 @@ export default {
                     change: 0,
                 },
             },
-
         };
     },
     setup() {
@@ -126,89 +126,61 @@ export default {
         }
     },
     methods: {
-
-        fetchData() {
+        async fetchData() {
             this.loading = true;
-            addTask("monitor", null, () => {
-                this.startPolling("monitor")
-            })
-        },
-        startPolling(taskId) {
-            this.pollingController = createPollingController();
-            fetchStatus(taskId, this.handleTaskResult, null, this.handleTaskComplete, 1000, this.pollingController);
-        },
-        stopPolling() {
-            if (this.pollingController) {
-                this.pollingController.stop();
-                console.log('Polling stopped.');
-            }
-        },
-        handleTaskResult(data) {
-            if (data.result) {
-                try {
-                    // 将列表转换为对象的函数
-                    function parseDataToObject(dataArray) {
-                        const parsedObject = {};
-                        dataArray.forEach((item) => {
-                            const splitIndex = item.indexOf(':');
-                            if (splitIndex !== -1) {
-                                const key = item.slice(0, splitIndex).trim();
-                                const value = item.slice(splitIndex + 1).trim();
-                                parsedObject[key] = value;
-                            }
-                        });
-                        return parsedObject;
-                    }
-                    // 使用正则提取纯数字
-                    function extractNumber(str) {
-                        return parseInt(str.replace(/[^0-9]/g, ''));
-                    }
-
-                    let { last, current } = data.result;
-
-                    // 解析 current 和 last 数据为对象
-                    const currentObj = parseDataToObject(current[0]);
-                    const lastObj = last ? parseDataToObject(last[0]) : null;
-
-                    // 提取 current 数据
-                    const currentEUStored = extractNumber(currentObj["EU Stored (exact)"].replace(/,/g, ''));
-                    const currentTotalWirelessEU = extractNumber(currentObj["Total wireless EU (exact)"].replace(/,/g, ''));
-
-                    // 计算 EUStored 的变化
-                    if (lastObj && lastObj["EU Stored (exact)"]) {
-                        const lastEUStored = extractNumber(lastObj["EU Stored (exact)"].replace(/,/g, ''));
-                        this.statistic.EUStored.change = (currentEUStored - lastEUStored) / lastEUStored;
-                    } else {
-                        this.statistic.EUStored.change = 0; // 如果没有 last 数据，change 设为 0
-                    }
-                    this.EUStoredValue = currentEUStored;
-
-                    // 计算 totalWirelessEU 的变化
-                    if (lastObj && lastObj["Total wireless EU (exact)"]) {
-                        const lastTotalWirelessEU = extractNumber(lastObj["Total wireless EU (exact)"].replace(/,/g, ''));
-                        this.statistic.totalWirelessEU.change = (currentTotalWirelessEU - lastTotalWirelessEU) / lastTotalWirelessEU;
-                    } else {
-                        this.statistic.totalWirelessEU.change = 0;
-                    }
-                    this.totalWirelessEUValue = currentTotalWirelessEU;
-
-
-
-
-                } catch (e) {
-                    console.error(e, data);
-                    this.$message.warning(e);
+            try {
+                const data = await fetchHistory('monitor');
+                if (data) {
+                    this.handleHistoryData(data);
                 }
-            } else {
-                this.$message.warning(`返回数据为空!`);
+            } catch (error) {
+                console.error('Error fetching history data:', error);
+            } finally {
+                this.loading = false;
             }
         },
-        handleTaskComplete() {
-            this.loading = false;
+        handleHistoryData(data) {
+            if (!data || !data.history || data.history.length === 0) {
+                ElMessage.warning('暂无历史数据');
+                return;
+            }
+
+            try {
+                // 获取最新的两条记录用于计算变化
+                const history = data.history;
+                const currentRecord = history[history.length - 1];
+                const lastRecord = history.length > 1 ? history[history.length - 2] : null;
+
+                // 提取 current 数据（现在 results 是对象，直接包含 eu_stored 和 total_wireless_eu）
+                const currentEUStored = currentRecord.results.eu_stored;
+                const currentTotalWirelessEU = currentRecord.results.total_wireless_eu;
+
+                // 计算 EUStored 的变化
+                if (lastRecord && lastRecord.results.eu_stored) {
+                    const lastEUStored = lastRecord.results.eu_stored;
+                    this.statistic.EUStored.change = (currentEUStored - lastEUStored) / lastEUStored;
+                } else {
+                    this.statistic.EUStored.change = 0;
+                }
+                this.EUStoredValue = currentEUStored;
+
+                // 计算 totalWirelessEU 的变化
+                if (lastRecord && lastRecord.results.total_wireless_eu) {
+                    const lastTotalWirelessEU = lastRecord.results.total_wireless_eu;
+                    this.statistic.totalWirelessEU.change = (currentTotalWirelessEU - lastTotalWirelessEU) / lastTotalWirelessEU;
+                } else {
+                    this.statistic.totalWirelessEU.change = 0;
+                }
+                this.totalWirelessEUValue = currentTotalWirelessEU;
+
+            } catch (e) {
+                console.error('Error parsing history data:', e, data);
+                ElMessage.warning('数据解析失败');
+            }
         },
     },
     mounted() {
-        this.startPolling("monitor");
+        this.fetchData();
     },
 };
 </script>

@@ -98,23 +98,30 @@ async def receive_chunked_report(request: Request, chunked: int = Query(-1, desc
     elif chunked == 0:
         device_manager.record_device(x_client_id, 'chunked_report')
         task = task_manager.get_task(task_id)
+        final_results = results
         if task and "results" in task:
             existing_results = task.get("results", [])
             if isinstance(existing_results, list) and isinstance(results, list):
                 existing_results.extend(results)  # 合并数据
-            task_manager.update_task(task_id, status=COMPLETED, results=existing_results)
+                final_results = existing_results
+            task_manager.update_task(task_id, status=COMPLETED, results=final_results)
         else:
             # 没有数据，直接保存结果并完成任务
-            task_manager.update_task(task_id, status=COMPLETED, results=results)
+            task_manager.update_task(task_id, status=COMPLETED, results=final_results)
 
         for config in [timer_task_config, task_config]:
             if task_id in config:
                 handle = config.get(task_id, {}).get("handle")
                 if handle:
-                    results = handle(results)
+                    final_results = handle(final_results)
                 callback = config.get(task_id, {}).get("callback")
                 if callback:
-                    callback(results)
+                    callback(final_results)
+                # 保存历史记录
+                save_history = config.get(task_id, {}).get("save_history", False)
+                if save_history:
+                    history_days = config.get(task_id, {}).get("history_days", 7)
+                    task_manager.save_to_history(task_id, final_results, history_days)
 
         return {"code": 200, "message": f"Task result received and completed", "data": {"taskId": task_id}}
 
@@ -153,6 +160,11 @@ async def receive_report(request: Request, x_client_id: Optional[str] = Header(N
             callback = config.get(task_id, {}).get("callback")
             if callback:
                 callback(results)
+            # 保存历史记录
+            save_history = config.get(task_id, {}).get("save_history", False)
+            if save_history:
+                history_days = config.get(task_id, {}).get("history_days", 7)
+                task_manager.save_to_history(task_id, results, history_days)
 
     task_manager.update_task(task_id, status=COMPLETED, results=results)
     return {"code": 200, "message": f"Task result received", "data": {"taskId": task_id}}
@@ -242,3 +254,43 @@ async def add_task_by_name(data: AddTaskByNameModel):
         task_manager.add_task(task_id, client_id, commands, READY, is_chunked=is_chunked)
 
     return {"code": 200, "message": f"Task added with {len(commands)} command(s)", "data": {"taskId": task_id}}
+
+
+@router.get("/history", response_model=StandardResponseModel, dependencies=[Depends(token_required)])
+async def get_task_history(
+    task_id: str = Query(..., description="任务id"),
+    start_time: Optional[int] = Query(None, description="开始时间（Unix时间戳，秒）"),
+    end_time: Optional[int] = Query(None, description="结束时间（Unix时间戳，秒）"),
+    use_gzip: bool = Query(False, description="对结果进行gzip压缩并返回base64编码"),
+):
+    """
+    获取指定task_id的历史任务数据，支持时间范围过滤
+    """
+    history = task_manager.get_task_history(task_id, start_time, end_time)
+    if history is None:
+        return {"code": 404, "message": "Task not found", "data": None}
+
+    result_data = {
+        "taskId": task_id,
+        "total": len(history),
+        "history": history,
+    }
+
+    if use_gzip:
+        gzip_result = gzip.compress(json.dumps(result_data).encode(), compresslevel=6)
+        result = base64.b64encode(gzip_result).decode()
+        return {
+            "code": 200,
+            "message": "success",
+            "data": {
+                "gzip": True,
+                "result": result,
+            },
+        }
+
+    return {
+        "code": 200,
+        "message": "success",
+        "data": result_data,
+    }
+

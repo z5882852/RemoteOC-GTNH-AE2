@@ -22,6 +22,18 @@ timer_task_config = {
     #     # 命令执行后的回调函数，callback(results: list)
     #     'callback': test,
     # },
+    # "monitor": {
+    #     'interval': 300,
+    #     "client_id": "client_01",
+    #     "commands": [
+    #         "return getCapacitorInfo()",  # 获取兰波顿电容库数据
+    #     ],
+    #     "cache": True,
+    #     "handle": parse_data,
+    #     "callback": None,
+    #     "save_history": True,  # 是否保存历史记录
+    #     "history_days": 7,  # 历史记录最大保存天数
+    # },
 }
 
 
@@ -79,15 +91,6 @@ task_config = {
         "commands": ["return ae.getAllCraftables()", "return ae.getCpuList()"],
         "cache": True,
         "handle": None,
-        "callback": None,
-    },
-    "monitor": {
-        "client_id": "client_01",
-        "commands": [
-            "return getCapacitorInfo()",  # 获取兰波顿电容库数据
-        ],
-        "cache": True,
-        "handle": parse_data,
         "callback": None,
     },
 }
