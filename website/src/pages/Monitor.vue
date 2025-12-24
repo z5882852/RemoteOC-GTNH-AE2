@@ -1,67 +1,28 @@
 <template>
     <div class="statistic-container">
-        <div class="statistic-card">
-            <el-statistic :value="statisticTransition.EUStored" suffix="EU" :formatter="(value) => formatNumber(value)">
-                <template #title>
-                    <div class="statistic-title" style="display: inline-flex; align-items: center">
-                        兰波顿存储电量
-                    </div>
-                </template>
-            </el-statistic>
-            <div class="statistic-footer">
-                <div class="footer-item">
-                    <span>相较于上一次数据</span>
-                    <span v-if="statistic.EUStored.change >= 0" class="green">
-                        {{ (Math.abs(statistic.EUStored.change) * 100).toFixed(2) }}%
-                        <el-icon>
-                            <CaretTop />
-                        </el-icon>
-                    </span>
-                    <span v-else class="red">
-                        {{ (Math.abs(statistic.EUStored.change) * 100).toFixed(2) }}%
-                        <el-icon>
-                            <CaretBottom />
-                        </el-icon>
-                    </span>
-                </div>
-            </div>
-        </div>
-        <div class="statistic-card">
-            <el-statistic :value="statisticTransition.totalWirelessEU" suffix="EU"
-                :formatter="(value) => formatNumber(value)">
-                <template #title>
-                    <div class="statistic-title" style="display: inline-flex; align-items: center">
-                        无线电网电量
-                        <el-tooltip effect="dark" content="该信息来源为兰波顿电容" placement="top">
-                            <el-icon style="margin-left: 4px" :size="12">
-                                <Warning />
-                            </el-icon>
-                        </el-tooltip>
-                    </div>
-                </template>
-            </el-statistic>
-            <div class="statistic-footer">
-                <div class="footer-item">
-                    <span>相较于上一次数据</span>
-                    <span v-if="statistic.totalWirelessEU.change >= 0" class="green">
-                        {{ (Math.abs(statistic.totalWirelessEU.change) * 100).toFixed(2) }}%
-                        <el-icon>
-                            <CaretTop />
-                        </el-icon>
-                    </span>
-                    <span v-else class="red">
-                        {{ (Math.abs(statistic.totalWirelessEU.change) * 100).toFixed(2) }}%
-                        <el-icon>
-                            <CaretBottom />
-                        </el-icon>
-                    </span>
-                </div>
-            </div>
-        </div>
-
+        <StatisticCard
+            title="兰波顿存储电量"
+            :displayValue="statisticTransition.EUStored"
+            :change="statistic.EUStored.change"
+            :formatter="formatNumber"
+        />
+        <StatisticCard
+            title="无线电网电量"
+            :displayValue="statisticTransition.totalWirelessEU"
+            :change="statistic.totalWirelessEU.change"
+            :formatter="formatNumber"
+            tooltip="该信息来源为兰波顿电容"
+        />
     </div>
 
-    <el-button class="refresh-button" size="large" :loading="loading" circle @click="fetchData">
+    <TrendChart
+        :historyData="chartHistoryData"
+        v-model:timeRange="timeRange"
+        v-model:granularity="granularity"
+        :loading="chartLoading"
+    />
+
+    <el-button class="refresh-button" size="large" :loading="loading" circle @click="refreshAll">
         <template #loading>
             <div class="custom-loading">
                 <el-icon size="large">
@@ -82,16 +43,20 @@
 <script>
 import { fetchHistory } from '@/utils/task'
 import { useTransition, useDark } from '@vueuse/core'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import StatisticCard from '@/components/monitor/StatisticCard.vue'
+import TrendChart from '@/components/monitor/TrendChart.vue'
 
 export default {
     name: 'Monitor',
     components: {
+        StatisticCard,
+        TrendChart,
     },
     data() {
         return {
-            loading: true,
+            loading: false,
             statistic: {
                 EUStored: {
                     change: 0,
@@ -100,6 +65,11 @@ export default {
                     change: 0,
                 },
             },
+            // 图表相关
+            timeRange: 4, // 默认4小时
+            granularity: 'none', // 默认无粒度
+            chartHistoryData: [],
+            chartLoading: false,
         };
     },
     setup() {
@@ -125,37 +95,52 @@ export default {
             isDark,
         }
     },
+    watch: {
+        timeRange() {
+            this.fetchChartData();
+        },
+        granularity() {
+            // granularity 变化时触发图表组件内部重新处理数据
+            // 由于 historyData 没变，需要重新获取以触发处理
+            this.fetchChartData();
+        },
+    },
     methods: {
-        async fetchData() {
+        async refreshAll() {
             this.loading = true;
             try {
-                const data = await fetchHistory('monitor');
-                if (data) {
-                    this.handleHistoryData(data);
-                }
-            } catch (error) {
-                console.error('Error fetching history data:', error);
+                await Promise.all([
+                    this.fetchStatisticData(),
+                    this.fetchChartData(),
+                ]);
             } finally {
                 this.loading = false;
             }
         },
-        handleHistoryData(data) {
+        async fetchStatisticData() {
+            try {
+                const data = await fetchHistory('monitor');
+                if (data) {
+                    this.handleStatisticData(data);
+                }
+            } catch (error) {
+                console.error('Error fetching statistic data:', error);
+            }
+        },
+        handleStatisticData(data) {
             if (!data || !data.history || data.history.length === 0) {
                 ElMessage.warning('暂无历史数据');
                 return;
             }
 
             try {
-                // 获取最新的两条记录用于计算变化
                 const history = data.history;
                 const currentRecord = history[history.length - 1];
                 const lastRecord = history.length > 1 ? history[history.length - 2] : null;
 
-                // 提取 current 数据（现在 results 是对象，直接包含 eu_stored 和 total_wireless_eu）
                 const currentEUStored = currentRecord.results.eu_stored;
                 const currentTotalWirelessEU = currentRecord.results.total_wireless_eu;
 
-                // 计算 EUStored 的变化
                 if (lastRecord && lastRecord.results.eu_stored) {
                     const lastEUStored = lastRecord.results.eu_stored;
                     this.statistic.EUStored.change = (currentEUStored - lastEUStored) / lastEUStored;
@@ -164,7 +149,6 @@ export default {
                 }
                 this.EUStoredValue = currentEUStored;
 
-                // 计算 totalWirelessEU 的变化
                 if (lastRecord && lastRecord.results.total_wireless_eu) {
                     const lastTotalWirelessEU = lastRecord.results.total_wireless_eu;
                     this.statistic.totalWirelessEU.change = (currentTotalWirelessEU - lastTotalWirelessEU) / lastTotalWirelessEU;
@@ -174,13 +158,36 @@ export default {
                 this.totalWirelessEUValue = currentTotalWirelessEU;
 
             } catch (e) {
-                console.error('Error parsing history data:', e, data);
+                console.error('Error parsing statistic data:', e, data);
                 ElMessage.warning('数据解析失败');
+            }
+        },
+        async fetchChartData() {
+            this.chartLoading = true;
+            try {
+                const now = Math.floor(Date.now() / 1000);
+                const startTime = now - this.timeRange * 3600;
+
+                const data = await fetchHistory('monitor', {
+                    start_time: startTime,
+                    end_time: now,
+                });
+
+                if (data && data.history && data.history.length > 0) {
+                    this.chartHistoryData = data.history;
+                } else {
+                    this.chartHistoryData = [];
+                }
+            } catch (error) {
+                console.error('Error fetching chart data:', error);
+                this.chartHistoryData = [];
+            } finally {
+                this.chartLoading = false;
             }
         },
     },
     mounted() {
-        this.fetchData();
+        this.refreshAll();
     },
 };
 </script>
@@ -199,24 +206,22 @@ export default {
     gap: 20px;
 }
 
-.statistic-container .el-statistic {
+.statistic-container > * {
     flex: 1 1 20%;
     min-width: 300px;
-    /* text-align: center; */
 }
 
 @media (max-width: 1400px) {
-    .statistic-container .el-statistic {
+    .statistic-container > * {
         flex: 1 1 45%;
     }
 }
 
 @media (max-width: 900px) {
-    .statistic-container .el-statistic {
+    .statistic-container > * {
         flex: 1 1 100%;
     }
 }
-
 
 :global(h2#card-usage ~ .example .example-showcase) {
     background-color: var(--el-fill-color) !important;
@@ -224,54 +229,5 @@ export default {
 
 .el-statistic {
     --el-statistic-content-font-size: 28px;
-}
-
-.statistic-card {
-    height: 100%;
-    padding: 40px;
-    border-radius: 4px;
-    background-color: var(--el-bg-color-overlay);
-}
-
-.statistic-title {
-    font-size: 16px;
-}
-
-.statistic-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    font-size: 12px;
-    color: var(--el-text-color-regular);
-    margin-top: 16px;
-}
-
-.statistic-footer .footer-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.statistic-footer .footer-item span:last-child {
-    display: inline-flex;
-    align-items: center;
-    margin-left: 4px;
-}
-
-.green {
-    color: var(--el-color-success);
-}
-
-.red {
-    color: var(--el-color-error);
-}
-</style>
-
-<style>
-html.dark {
-    .statistic-card {
-        background: none;
-    }
 }
 </style>
