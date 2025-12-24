@@ -85,8 +85,6 @@ task_config = {
         "client_id": "client_01",
         "commands": [
             "return getCapacitorInfo()",  # 获取兰波顿电容库数据
-            "return calculate_fluid_me_totals()",  # 获取流体存储元件数据
-            "return calculate_item_me_totals()",  # 获取物品存储元件数据
         ],
         "cache": True,
         "handle": parse_data,

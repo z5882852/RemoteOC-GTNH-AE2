@@ -58,45 +58,9 @@
                 </div>
             </div>
         </div>
-        <div class="statistic-card">
-            <el-statistic :value="statisticTransition.totalItemUsage" suffix="B"
-                :formatter="(value) => formatNumber(value)">
-                <template #title>
-                    <div class="statistic-title" style="display: inline-flex; align-items: center">
-                        物品存储元件已用字节
-                        <el-tooltip effect="dark" content="该信息为根据驱动器内的元件计算，不包括存储总线内容" placement="top">
-                            <el-icon style="margin-left: 4px" :size="12">
-                                <Warning />
-                            </el-icon>
-                        </el-tooltip>
-                    </div>
-                </template>
-            </el-statistic>
-            <div class="statistic-footer">
-                <div class="footer-item">
-                    <span>相较于上一次数据</span>
-                    <span v-if="statistic.totalItemUsage.change >= 0" class="green">
-                        {{ (Math.abs(statistic.totalItemUsage.change) * 100).toFixed(2) }}%
-                        <el-icon>
-                            <CaretTop />
-                        </el-icon>
-                    </span>
-                    <span v-else class="red">
-                        {{ (Math.abs(statistic.totalItemUsage.change) * 100).toFixed(2) }}%
-                        <el-icon>
-                            <CaretBottom />
-                        </el-icon>
-                    </span>
-                </div>
-            </div>
-        </div>
+
     </div>
-    <div class="chart-container">
-        <div id="chart1" class="chart"></div>
-        <div id="chart2" class="chart"></div>
-        <div id="chart3" class="chart"></div>
-        <div id="chart4" class="chart"></div>
-    </div>
+
     <el-button class="refresh-button" size="large" :loading="loading" circle @click="fetchData">
         <template #loading>
             <div class="custom-loading">
@@ -119,7 +83,6 @@
 import { fetchStatus, addTask, createPollingController } from '@/utils/task'
 import { useTransition, useDark } from '@vueuse/core'
 import { ref } from 'vue'
-import * as echarts from 'echarts';
 
 export default {
     name: 'Monitor',
@@ -135,28 +98,17 @@ export default {
                 totalWirelessEU: {
                     change: 0,
                 },
-                totalItemUsage: {
-                    change: 0,
-                },
             },
-            chartInstances: [],
-            chartData: [
-                { "title": "物品字节使用", "data": [{ "value": 0, "name": "已使用", itemStyle: { color: '#66ccff' } }, { "value": 0, "name": "空闲", itemStyle: { color: '#f1f1f1' } }] },
-                { "title": "物品种类使用", "data": [{ "value": 0, "name": "已使用", itemStyle: { color: '#66ccff' } }, { "value": 0, "name": "未使用", itemStyle: { color: '#f1f1f1' } }] },
-                { "title": "流体字节使用", "data": [{ "value": 0, "name": "已使用", itemStyle: { color: '#66ccff' } }, { "value": 0, "name": "空闲", itemStyle: { color: '#f1f1f1' } }] },
-                { "title": "流体种类使用", "data": [{ "value": 0, "name": "已使用", itemStyle: { color: '#66ccff' } }, { "value": 0, "name": "未使用", itemStyle: { color: '#f1f1f1' } }] }
-            ],
+
         };
     },
     setup() {
         const EUStoredValue = ref(0)
         const totalWirelessEUValue = ref(0)
-        const totalItemUsageValue = ref(0)
 
         const statisticTransition = {
             EUStored: useTransition(EUStoredValue, { duration: 800, }),
             totalWirelessEU: useTransition(totalWirelessEUValue, { duration: 800, }),
-            totalItemUsage: useTransition(totalItemUsageValue, { duration: 800, }),
         }
 
         const formatNumber = (num) => {
@@ -168,64 +120,13 @@ export default {
         return {
             EUStoredValue,
             totalWirelessEUValue,
-            totalItemUsageValue,
             statisticTransition,
             formatNumber,
             isDark,
         }
     },
     methods: {
-        initCharts() {
-            const chartIds = ['chart1', 'chart2', 'chart3', 'chart4'];
 
-            chartIds.forEach((id, index) => {
-                const chart = echarts.init(document.getElementById(id));
-                chart.setOption({
-                    title: {
-                        text: this.chartData[index].title,
-                        left: 'center',
-                        top: 'bottom',
-                        textStyle: {
-                            color: this.isDark ? '#CFD3DC':'#1a1a1a',
-                        }
-                    },
-                    tooltip: {
-                        trigger: 'item',
-                        formatter: "{b}: <br/>{c} ({d}%)",
-                    },
-                    graphic: [{
-                        type: 'text',
-                        left: 'center',
-                        top: 'center',
-                        z: 10,
-                        style: {
-                            fill: this.isDark ? '#E5EAF3':'#1a1a1a',
-                            text: `${(this.chartData[index].data[0]['value'] / this.chartData[index].data[1]['value'] * 100).toFixed(2)}%`,
-                            font: '18px'
-                        }
-                    }],
-                    series: [
-                        {
-                            name: this.chartData[index].title,
-                            type: 'pie',
-                            radius: ['40%', '50%'],
-                            label: {
-                                position: 'center',
-                                fontSize: 20,
-                                color: this.isDark ? '#E5EAF3':'#333',
-                                show: false,
-                            },
-                            emphasis: {},
-                            data: this.chartData[index].data,
-                        },
-                    ],
-                });
-                this.chartInstances.push(chart);
-            });
-        },
-        resizeCharts() {
-            this.chartInstances.forEach(chart => chart.resize());
-        },
         fetchData() {
             this.loading = true;
             addTask("monitor", null, () => {
@@ -272,7 +173,6 @@ export default {
                     // 提取 current 数据
                     const currentEUStored = extractNumber(currentObj["EU Stored (exact)"].replace(/,/g, ''));
                     const currentTotalWirelessEU = extractNumber(currentObj["Total wireless EU (exact)"].replace(/,/g, ''));
-                    const currentTotalItemUsage = current[2].total_usage;
 
                     // 计算 EUStored 的变化
                     if (lastObj && lastObj["EU Stored (exact)"]) {
@@ -292,102 +192,9 @@ export default {
                     }
                     this.totalWirelessEUValue = currentTotalWirelessEU;
 
-                    // 计算 totalItemUsage 的变化
-                    if (last && last[2] && last[2].total_usage) {
-                        const lastTotalItemUsage = last[2].total_usage;
-                        this.statistic.totalItemUsage.change = (currentTotalItemUsage - lastTotalItemUsage) / lastTotalItemUsage;
-                    } else {
-                        this.statistic.totalItemUsage.change = 0;
-                    }
-                    this.totalItemUsageValue = currentTotalItemUsage;
 
 
 
-                    this.chartData = [
-                        {
-                            title: "物品字节使用",
-                            data: [
-                                {
-                                    value: current[2].total_usage,
-                                    name: "已使用",
-                                    itemStyle: { color: '#66ccff' },
-                                },
-                                {
-                                    value: current[2].total_capacity - current[2].total_usage,
-                                    name: "空闲",
-                                    itemStyle: { color: '#f1f1f1' },
-                                },
-                            ],
-                        },
-                        {
-                            title: "物品种类使用",
-                            data: [
-                                {
-                                    value: current[2].used_types,
-                                    name: "已使用",
-                                    itemStyle: { color: '#66ccff' },
-                                },
-                                {
-                                    value: current[2].total_available_types - current[2].used_types,
-                                    name: "未使用",
-                                    itemStyle: { color: '#f1f1f1' },
-                                },
-                            ],
-                        },
-                        {
-                            title: "流体字节使用",
-                            data: [
-                                {
-                                    value: current[1].total_usage,
-                                    name: "已使用",
-                                    itemStyle: { color: '#66ccff' },
-                                },
-                                {
-                                    value: current[1].total_capacity - current[1].total_usage,
-                                    name: "空闲",
-                                    itemStyle: { color: '#f1f1f1' },
-                                },
-                            ],
-                        },
-                        {
-                            title: "流体种类使用",
-                            data: [
-                                {
-                                    value: current[1].used_types,
-                                    name: "已使用",
-                                    itemStyle: { color: '#66ccff' },
-                                },
-                                {
-                                    value: current[1].total_available_types - current[1].used_types,
-                                    name: "未使用",
-                                    itemStyle: { color: '#f1f1f1' },
-                                },
-                            ],
-                        },
-                    ];
-
-                    // 更新图表
-                    this.chartInstances.forEach((chart, index) => {
-                        chart.setOption({
-                            series: [
-                                {
-                                    data: this.chartData[index].data,
-                                },
-                            ],
-                            graphic: [
-                                {
-                                    style: {
-                                        text: `${(
-                                            (this.chartData[index].data[0].value /
-                                                (this.chartData[index].data[0].value +
-                                                    this.chartData[index].data[1].value)) *
-                                            100
-                                        ).toFixed(2)}%`,
-                                    },
-                                },
-                            ],
-                        });
-                    });
                 } catch (e) {
                     console.error(e, data);
                     this.$message.warning(e);
@@ -402,12 +209,6 @@ export default {
     },
     mounted() {
         this.startPolling("monitor");
-        this.initCharts();
-        window.addEventListener('resize', this.resizeCharts);
-    },
-    beforeUnmount() {
-        window.removeEventListener('resize', this.resizeCharts);
-        this.chartInstances.forEach(chart => chart.dispose());
     },
 };
 </script>
@@ -432,35 +233,14 @@ export default {
     /* text-align: center; */
 }
 
-.chart-container {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-around;
-    gap: 20px;
-}
-
-.chart {
-    flex: 1 1 20%;
-    min-width: 200px;
-    height: 300px;
-}
-
 @media (max-width: 1400px) {
     .statistic-container .el-statistic {
-        flex: 1 1 45%;
-    }
-
-    .chart {
         flex: 1 1 45%;
     }
 }
 
 @media (max-width: 900px) {
     .statistic-container .el-statistic {
-        flex: 1 1 100%;
-    }
-
-    .chart {
         flex: 1 1 100%;
     }
 }
