@@ -140,14 +140,22 @@ export default {
                     textStyle: { color: textColor, fontSize: 14 },
                 },
                 tooltip: {
-                    trigger: 'axis',
-                    axisPointer: {
-                        type: 'line',
-                        snap: true,
+                    trigger: 'item',
+                    backgroundColor: 'rgba(50, 50, 50, 0.9)',
+                    borderColor: '#333',
+                    borderWidth: 1,
+                    padding: [8, 12],
+                    textStyle: {
+                        color: '#fff',
+                        fontSize: 13,
                     },
                     formatter: (params) => {
-                        const data = params[0];
-                        return `${data.axisValue}<br/>${data.seriesName}: ${this.formatLargeNumber(data.value)}`;
+                        const time = params.name || '';
+                        const formatted = this.formatLargeNumber(params.value);
+                        const raw = Math.round(params.value).toLocaleString();
+                        return `<div style="font-weight: bold; margin-bottom: 4px;">${time}</div>
+                                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${params.color};margin-right:6px;"></span>${formatted}<br/>
+                                <div style="margin-left: 16px; color: #aaa; font-size: 12px;">${raw}</div>`;
                     },
                 },
                 grid: {
@@ -164,6 +172,7 @@ export default {
                         color: textColor,
                         rotate: 45,
                         fontSize: 10,
+                        interval: 'auto',
                     },
                 },
                 yAxis: {
@@ -178,6 +187,17 @@ export default {
                     type: 'line',
                     smooth: true,
                     data: [],
+                    showSymbol: true,
+                    symbol: 'circle',
+                    symbolSize: 6,
+                    emphasis: {
+                        scale: true,
+                        focus: 'series',
+                        itemStyle: {
+                            borderWidth: 2,
+                            borderColor: '#fff',
+                        }
+                    },
                     areaStyle: {
                         opacity: 0.3,
                     },

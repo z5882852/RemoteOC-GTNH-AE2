@@ -23,7 +23,7 @@
 - 支持远程下单
 - 支持自动化流程
 - 支持监控兰波顿电容的电量和无线电网电量（需配置）
-- 支持监控物品和流体存储元件的状态（需配置）
+- 支持监控波顿电容的电量和无线电网电量历史趋势（需配置）
 
 
 ## 特色
@@ -291,7 +291,7 @@ website/   # 网页前端
 <details>
 <summary>点击展开</summary>
 
-![监控](assets/monitor.png)
+![监控](assets/monitor.jpeg)
 ![物品](assets/items.png)
 ![流体](assets/fluids.png)
 ![下单](assets/craft.png)
@@ -309,12 +309,31 @@ website/   # 网页前端
 
 #### 功能
 - 监控兰波顿电容的电量和无线电网电量
+- 兰波顿电量和无线电网电量历史趋势
 
 #### 准备工作
 - 将适配器连接到兰波顿库电容上
 
 #### 配置
 - 修改`powerMonitor.lua`文件中代理地址为兰波顿电容库地址
+- 将后端`config.py`的定时任务设置添加以下内容:
+    ```Python
+    timer_task_config = {
+        # {...}, 其他定时任务配置
+        "monitor": {
+            'interval': 300,  # 间隔时间
+            "client_id": "client_01",
+            "commands": [
+                "return getCapacitorInfo()",
+            ],
+            "cache": True,
+            "handle": parse_data,
+            "callback": None,
+            "save_history": True,
+            "history_days": 7,  # 历史记录最大保存天数
+        },
+    }
+    ```
 - 在网页前端的`设置`中启用监控页面
 
 ## TODO
