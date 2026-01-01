@@ -35,7 +35,7 @@
                         <el-option label="自定义" value="custom" />
                     </el-select>
                 </div>
-                <div class="control-item" v-if="timeRangeValue === 'custom'">
+                <div class="control-item date-picker-item" v-if="timeRangeValue === 'custom'">
                     <el-date-picker
                         v-model="customTimeRangeLocal"
                         type="datetimerange"
@@ -43,7 +43,17 @@
                         start-placeholder="开始时间"
                         end-placeholder="结束时间"
                         size="small"
+                        :teleported="true"
                         :shortcuts="dateShortcuts"
+                        popper-class="custom-date-picker-popper"
+                        :popper-options="{
+                            placement: 'bottom-start',
+                            modifiers: [
+                                { name: 'flip', options: { fallbackPlacements: ['top-start', 'bottom-end', 'top-end'] } },
+                                { name: 'preventOverflow', options: { boundary: 'viewport', padding: 8, altAxis: true } },
+                                { name: 'offset', options: { offset: [0, 4] } }
+                            ]
+                        }"
                         @change="handleCustomTimeChange"
                     />
                 </div>
@@ -530,6 +540,12 @@ export default {
         min-width: 140px;
     }
 
+    .date-picker-item {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+    }
+
     .chart {
         height: 250px;
     }
@@ -559,5 +575,15 @@ html.dark {
     .trend-card {
         background: none;
     }
+}
+
+/* 日期选择器弹窗自适应 */
+.custom-date-picker-popper {
+    max-width: calc(100vw - 16px) !important;
+}
+
+.custom-date-picker-popper .el-picker-panel__body-wrapper {
+    max-width: 100%;
+    overflow-x: auto;
 }
 </style>
