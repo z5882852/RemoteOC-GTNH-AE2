@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from callback import *
 from action import *
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 # 加载 .env 文件中的环境变量
 if os.path.exists('.env.dev'):
@@ -21,6 +21,18 @@ timer_task_config = {
     #     ],
     #     # 命令执行后的回调函数，callback(results: list)
     #     'callback': test,
+    # },
+    # "monitor": {
+    #     'interval': 300,
+    #     "client_id": "client_01",
+    #     "commands": [
+    #         "return getCapacitorInfo()",  # 获取兰波顿电容库数据
+    #     ],
+    #     "cache": True,
+    #     "handle": parse_data,
+    #     "callback": None,
+    #     "save_history": True,  # 是否保存历史记录
+    #     "history_days": 7,  # 历史记录最大保存天数
     # },
 }
 
@@ -79,17 +91,6 @@ task_config = {
         "commands": ["return ae.getAllCraftables()", "return ae.getCpuList()"],
         "cache": True,
         "handle": None,
-        "callback": None,
-    },
-    "monitor": {
-        "client_id": "client_01",
-        "commands": [
-            "return getCapacitorInfo()",  # 获取兰波顿电容库数据
-            "return calculate_fluid_me_totals()",  # 获取流体存储元件数据
-            "return calculate_item_me_totals()",  # 获取物品存储元件数据
-        ],
-        "cache": True,
-        "handle": parse_data,
         "callback": None,
     },
 }

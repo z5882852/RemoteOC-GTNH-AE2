@@ -277,9 +277,56 @@ const createCraftTask = (itemName, ItemDamage, amount = 1, cpuName, label, callb
     });
 }
 
+/**
+ * 获取任务历史数据
+ * @param {string} task_id - 任务 ID
+ * @param {object} options - 可选参数
+ * @param {number} options.start_time - 开始时间（Unix 时间戳，秒）
+ * @param {number} options.end_time - 结束时间（Unix 时间戳，秒）
+ * @param {boolean} options.use_gzip - 是否启用 gzip 压缩
+ * @returns {Promise<object>} 返回历史数据
+ */
+const fetchHistory = async (task_id, options = {}) => {
+    try {
+        if (!Setting.get('backendUrl') || Setting.get('backendUrl') === '') {
+            ElMessage.error('请先设置后端地址！');
+            return null;
+        }
+
+        const params = { task_id, ...options };
+        const response = await Requests.get('/api/task/history', params);
+        const { code, data, message } = response.data;
+
+        if (code === 200) {
+            // 处理 gzip 压缩的响应
+            if (data.gzip && data.result) {
+                let binaryString = atob(data.result);
+                let binaryData = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    binaryData[i] = binaryString.charCodeAt(i);
+                }
+                let result = pako.inflate(binaryData, { to: 'string' });
+                return JSON.parse(result);
+            }
+            return data;
+        } else if (code === 404) {
+            ElMessage.warning('任务不存在或暂无历史数据');
+            return null;
+        } else {
+            ElMessage.error(`获取历史数据失败: ${message}`);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error fetching history data:', error);
+        ElMessage.error(`获取历史数据失败: ${error}`);
+        return null;
+    }
+};
+
 export {
     fetchStatus,
     fetchStatusOnce,
+    fetchHistory,
     addTask,
     createPollingController,
     localTask,

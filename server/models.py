@@ -61,3 +61,18 @@ class AddTimerModel(BaseModel):
 # 定义定时器请求模型，用于定时器的查询和删除
 class TimerRequestModel(BaseModel):
     timer_id: str = Field(..., description="定时器 ID")
+
+
+# 定义历史记录项模型
+class TaskHistoryItemModel(BaseModel):
+    results: Any = Field(None, description="任务执行的结果")
+    created_time: Optional[str] = Field(None, description="任务创建时间")
+    pending_time: Optional[str] = Field(None, description="任务开始执行时间")
+    completed_time: Optional[str] = Field(None, description="任务完成时间")
+
+
+# 定义历史记录响应模型
+class TaskHistoryResponseModel(BaseModel):
+    task_id: str = Field(..., description="任务的唯一标识符")
+    total: int = Field(..., description="历史记录总数")
+    history: List[TaskHistoryItemModel] = Field(..., description="历史记录列表")

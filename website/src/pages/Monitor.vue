@@ -1,103 +1,30 @@
 <template>
     <div class="statistic-container">
-        <div class="statistic-card">
-            <el-statistic :value="statisticTransition.EUStored" suffix="EU" :formatter="(value) => formatNumber(value)">
-                <template #title>
-                    <div class="statistic-title" style="display: inline-flex; align-items: center">
-                        兰波顿存储电量
-                    </div>
-                </template>
-            </el-statistic>
-            <div class="statistic-footer">
-                <div class="footer-item">
-                    <span>相较于上一次数据</span>
-                    <span v-if="statistic.EUStored.change >= 0" class="green">
-                        {{ (Math.abs(statistic.EUStored.change) * 100).toFixed(2) }}%
-                        <el-icon>
-                            <CaretTop />
-                        </el-icon>
-                    </span>
-                    <span v-else class="red">
-                        {{ (Math.abs(statistic.EUStored.change) * 100).toFixed(2) }}%
-                        <el-icon>
-                            <CaretBottom />
-                        </el-icon>
-                    </span>
-                </div>
-            </div>
-        </div>
-        <div class="statistic-card">
-            <el-statistic :value="statisticTransition.totalWirelessEU" suffix="EU"
-                :formatter="(value) => formatNumber(value)">
-                <template #title>
-                    <div class="statistic-title" style="display: inline-flex; align-items: center">
-                        无线电网电量
-                        <el-tooltip effect="dark" content="该信息来源为兰波顿电容" placement="top">
-                            <el-icon style="margin-left: 4px" :size="12">
-                                <Warning />
-                            </el-icon>
-                        </el-tooltip>
-                    </div>
-                </template>
-            </el-statistic>
-            <div class="statistic-footer">
-                <div class="footer-item">
-                    <span>相较于上一次数据</span>
-                    <span v-if="statistic.totalWirelessEU.change >= 0" class="green">
-                        {{ (Math.abs(statistic.totalWirelessEU.change) * 100).toFixed(2) }}%
-                        <el-icon>
-                            <CaretTop />
-                        </el-icon>
-                    </span>
-                    <span v-else class="red">
-                        {{ (Math.abs(statistic.totalWirelessEU.change) * 100).toFixed(2) }}%
-                        <el-icon>
-                            <CaretBottom />
-                        </el-icon>
-                    </span>
-                </div>
-            </div>
-        </div>
-        <div class="statistic-card">
-            <el-statistic :value="statisticTransition.totalItemUsage" suffix="B"
-                :formatter="(value) => formatNumber(value)">
-                <template #title>
-                    <div class="statistic-title" style="display: inline-flex; align-items: center">
-                        物品存储元件已用字节
-                        <el-tooltip effect="dark" content="该信息为根据驱动器内的元件计算，不包括存储总线内容" placement="top">
-                            <el-icon style="margin-left: 4px" :size="12">
-                                <Warning />
-                            </el-icon>
-                        </el-tooltip>
-                    </div>
-                </template>
-            </el-statistic>
-            <div class="statistic-footer">
-                <div class="footer-item">
-                    <span>相较于上一次数据</span>
-                    <span v-if="statistic.totalItemUsage.change >= 0" class="green">
-                        {{ (Math.abs(statistic.totalItemUsage.change) * 100).toFixed(2) }}%
-                        <el-icon>
-                            <CaretTop />
-                        </el-icon>
-                    </span>
-                    <span v-else class="red">
-                        {{ (Math.abs(statistic.totalItemUsage.change) * 100).toFixed(2) }}%
-                        <el-icon>
-                            <CaretBottom />
-                        </el-icon>
-                    </span>
-                </div>
-            </div>
-        </div>
+        <StatisticCard
+            title="兰波顿存储电量"
+            :displayValue="statisticTransition.EUStored"
+            :change="statistic.EUStored.change"
+            :formatter="formatNumber"
+        />
+        <StatisticCard
+            title="无线电网电量"
+            :displayValue="statisticTransition.totalWirelessEU"
+            :change="statistic.totalWirelessEU.change"
+            :formatter="formatNumber"
+            tooltip="该信息来源为兰波顿电容"
+        />
     </div>
-    <div class="chart-container">
-        <div id="chart1" class="chart"></div>
-        <div id="chart2" class="chart"></div>
-        <div id="chart3" class="chart"></div>
-        <div id="chart4" class="chart"></div>
-    </div>
-    <el-button class="refresh-button" size="large" :loading="loading" circle @click="fetchData">
+
+    <TrendChart
+        :historyData="chartHistoryData"
+        v-model:timeRange="timeRange"
+        v-model:granularity="granularity"
+        v-model:customStartTime="customStartTime"
+        v-model:customEndTime="customEndTime"
+        :loading="chartLoading"
+    />
+
+    <el-button class="refresh-button" size="large" :loading="loading" circle @click="refreshAll">
         <template #loading>
             <div class="custom-loading">
                 <el-icon size="large">
@@ -116,18 +43,22 @@
 </template>
 
 <script>
-import { fetchStatus, addTask, createPollingController } from '@/utils/task'
+import { fetchHistory } from '@/utils/task'
 import { useTransition, useDark } from '@vueuse/core'
-import { ref } from 'vue'
-import * as echarts from 'echarts';
+import { ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import StatisticCard from '@/components/monitor/StatisticCard.vue'
+import TrendChart from '@/components/monitor/TrendChart.vue'
 
 export default {
     name: 'Monitor',
     components: {
+        StatisticCard,
+        TrendChart,
     },
     data() {
         return {
-            loading: true,
+            loading: false,
             statistic: {
                 EUStored: {
                     change: 0,
@@ -135,32 +66,27 @@ export default {
                 totalWirelessEU: {
                     change: 0,
                 },
-                totalItemUsage: {
-                    change: 0,
-                },
             },
-            chartInstances: [],
-            chartData: [
-                { "title": "物品字节使用", "data": [{ "value": 0, "name": "已使用", itemStyle: { color: '#66ccff' } }, { "value": 0, "name": "空闲", itemStyle: { color: '#f1f1f1' } }] },
-                { "title": "物品种类使用", "data": [{ "value": 0, "name": "已使用", itemStyle: { color: '#66ccff' } }, { "value": 0, "name": "未使用", itemStyle: { color: '#f1f1f1' } }] },
-                { "title": "流体字节使用", "data": [{ "value": 0, "name": "已使用", itemStyle: { color: '#66ccff' } }, { "value": 0, "name": "空闲", itemStyle: { color: '#f1f1f1' } }] },
-                { "title": "流体种类使用", "data": [{ "value": 0, "name": "已使用", itemStyle: { color: '#66ccff' } }, { "value": 0, "name": "未使用", itemStyle: { color: '#f1f1f1' } }] }
-            ],
+            // 图表相关
+            timeRange: 4, // 默认4小时
+            granularity: 'none', // 默认无粒度
+            customStartTime: null, // 自定义开始时间（Unix时间戳）
+            customEndTime: null, // 自定义结束时间（Unix时间戳）
+            chartHistoryData: [],
+            chartLoading: false,
         };
     },
     setup() {
         const EUStoredValue = ref(0)
         const totalWirelessEUValue = ref(0)
-        const totalItemUsageValue = ref(0)
 
         const statisticTransition = {
             EUStored: useTransition(EUStoredValue, { duration: 800, }),
             totalWirelessEU: useTransition(totalWirelessEUValue, { duration: 800, }),
-            totalItemUsage: useTransition(totalItemUsageValue, { duration: 800, }),
         }
 
         const formatNumber = (num) => {
-            return parseInt(num.value).toLocaleString()
+            return num.value.toLocaleString('zh-CN', { maximumFractionDigits: 0 })
         }
 
         const isDark = useDark()
@@ -168,246 +94,132 @@ export default {
         return {
             EUStoredValue,
             totalWirelessEUValue,
-            totalItemUsageValue,
             statisticTransition,
             formatNumber,
             isDark,
         }
     },
+    watch: {
+        timeRange(newVal) {
+            // 如果不是自定义模式，则直接获取数据
+            if (newVal !== 'custom') {
+                this.fetchChartData();
+            }
+        },
+        granularity() {
+            // granularity 变化时触发图表组件内部重新处理数据
+            // 由于 historyData 没变，需要重新获取以触发处理
+            this.fetchChartData();
+        },
+        customStartTime() {
+            // 自定义时间变化时重新获取数据
+            if (this.timeRange === 'custom') {
+                this.fetchChartData();
+            }
+        },
+        customEndTime() {
+            // 自定义时间变化时重新获取数据
+            if (this.timeRange === 'custom') {
+                this.fetchChartData();
+            }
+        },
+    },
     methods: {
-        initCharts() {
-            const chartIds = ['chart1', 'chart2', 'chart3', 'chart4'];
-
-            chartIds.forEach((id, index) => {
-                const chart = echarts.init(document.getElementById(id));
-                chart.setOption({
-                    title: {
-                        text: this.chartData[index].title,
-                        left: 'center',
-                        top: 'bottom',
-                        textStyle: {
-                            color: this.isDark ? '#CFD3DC':'#1a1a1a',
-                        }
-                    },
-                    tooltip: {
-                        trigger: 'item',
-                        formatter: "{b}: <br/>{c} ({d}%)",
-                    },
-                    graphic: [{
-                        type: 'text',
-                        left: 'center',
-                        top: 'center',
-                        z: 10,
-                        style: {
-                            fill: this.isDark ? '#E5EAF3':'#1a1a1a',
-                            text: `${(this.chartData[index].data[0]['value'] / this.chartData[index].data[1]['value'] * 100).toFixed(2)}%`,
-                            font: '18px'
-                        }
-                    }],
-                    series: [
-                        {
-                            name: this.chartData[index].title,
-                            type: 'pie',
-                            radius: ['40%', '50%'],
-                            label: {
-                                position: 'center',
-                                fontSize: 20,
-                                color: this.isDark ? '#E5EAF3':'#333',
-                                show: false,
-                            },
-                            emphasis: {},
-                            data: this.chartData[index].data,
-                        },
-                    ],
-                });
-                this.chartInstances.push(chart);
-            });
-        },
-        resizeCharts() {
-            this.chartInstances.forEach(chart => chart.resize());
-        },
-        fetchData() {
+        async refreshAll() {
             this.loading = true;
-            addTask("monitor", null, () => {
-                this.startPolling("monitor")
-            })
-        },
-        startPolling(taskId) {
-            this.pollingController = createPollingController();
-            fetchStatus(taskId, this.handleTaskResult, null, this.handleTaskComplete, 1000, this.pollingController);
-        },
-        stopPolling() {
-            if (this.pollingController) {
-                this.pollingController.stop();
-                console.log('Polling stopped.');
+            try {
+                await Promise.all([
+                    this.fetchStatisticData(),
+                    this.fetchChartData(),
+                ]);
+            } finally {
+                this.loading = false;
             }
         },
-        handleTaskResult(data) {
-            if (data.result) {
-                try {
-                    // 将列表转换为对象的函数
-                    function parseDataToObject(dataArray) {
-                        const parsedObject = {};
-                        dataArray.forEach((item) => {
-                            const splitIndex = item.indexOf(':');
-                            if (splitIndex !== -1) {
-                                const key = item.slice(0, splitIndex).trim();
-                                const value = item.slice(splitIndex + 1).trim();
-                                parsedObject[key] = value;
-                            }
-                        });
-                        return parsedObject;
-                    }
-                    // 使用正则提取纯数字
-                    function extractNumber(str) {
-                        return parseInt(str.replace(/[^0-9]/g, ''));
-                    }
-
-                    let { last, current } = data.result;
-
-                    // 解析 current 和 last 数据为对象
-                    const currentObj = parseDataToObject(current[0]);
-                    const lastObj = last ? parseDataToObject(last[0]) : null;
-
-                    // 提取 current 数据
-                    const currentEUStored = extractNumber(currentObj["EU Stored (exact)"].replace(/,/g, ''));
-                    const currentTotalWirelessEU = extractNumber(currentObj["Total wireless EU (exact)"].replace(/,/g, ''));
-                    const currentTotalItemUsage = current[2].total_usage;
-
-                    // 计算 EUStored 的变化
-                    if (lastObj && lastObj["EU Stored (exact)"]) {
-                        const lastEUStored = extractNumber(lastObj["EU Stored (exact)"].replace(/,/g, ''));
-                        this.statistic.EUStored.change = (currentEUStored - lastEUStored) / lastEUStored;
-                    } else {
-                        this.statistic.EUStored.change = 0; // 如果没有 last 数据，change 设为 0
-                    }
-                    this.EUStoredValue = currentEUStored;
-
-                    // 计算 totalWirelessEU 的变化
-                    if (lastObj && lastObj["Total wireless EU (exact)"]) {
-                        const lastTotalWirelessEU = extractNumber(lastObj["Total wireless EU (exact)"].replace(/,/g, ''));
-                        this.statistic.totalWirelessEU.change = (currentTotalWirelessEU - lastTotalWirelessEU) / lastTotalWirelessEU;
-                    } else {
-                        this.statistic.totalWirelessEU.change = 0;
-                    }
-                    this.totalWirelessEUValue = currentTotalWirelessEU;
-
-                    // 计算 totalItemUsage 的变化
-                    if (last && last[2] && last[2].total_usage) {
-                        const lastTotalItemUsage = last[2].total_usage;
-                        this.statistic.totalItemUsage.change = (currentTotalItemUsage - lastTotalItemUsage) / lastTotalItemUsage;
-                    } else {
-                        this.statistic.totalItemUsage.change = 0;
-                    }
-                    this.totalItemUsageValue = currentTotalItemUsage;
-
-
-
-                    this.chartData = [
-                        {
-                            title: "物品字节使用",
-                            data: [
-                                {
-                                    value: current[2].total_usage,
-                                    name: "已使用",
-                                    itemStyle: { color: '#66ccff' },
-                                },
-                                {
-                                    value: current[2].total_capacity - current[2].total_usage,
-                                    name: "空闲",
-                                    itemStyle: { color: '#f1f1f1' },
-                                },
-                            ],
-                        },
-                        {
-                            title: "物品种类使用",
-                            data: [
-                                {
-                                    value: current[2].used_types,
-                                    name: "已使用",
-                                    itemStyle: { color: '#66ccff' },
-                                },
-                                {
-                                    value: current[2].total_available_types - current[2].used_types,
-                                    name: "未使用",
-                                    itemStyle: { color: '#f1f1f1' },
-                                },
-                            ],
-                        },
-                        {
-                            title: "流体字节使用",
-                            data: [
-                                {
-                                    value: current[1].total_usage,
-                                    name: "已使用",
-                                    itemStyle: { color: '#66ccff' },
-                                },
-                                {
-                                    value: current[1].total_capacity - current[1].total_usage,
-                                    name: "空闲",
-                                    itemStyle: { color: '#f1f1f1' },
-                                },
-                            ],
-                        },
-                        {
-                            title: "流体种类使用",
-                            data: [
-                                {
-                                    value: current[1].used_types,
-                                    name: "已使用",
-                                    itemStyle: { color: '#66ccff' },
-                                },
-                                {
-                                    value: current[1].total_available_types - current[1].used_types,
-                                    name: "未使用",
-                                    itemStyle: { color: '#f1f1f1' },
-                                },
-                            ],
-                        },
-                    ];
-
-                    // 更新图表
-                    this.chartInstances.forEach((chart, index) => {
-                        chart.setOption({
-                            series: [
-                                {
-                                    data: this.chartData[index].data,
-                                },
-                            ],
-                            graphic: [
-                                {
-                                    style: {
-                                        text: `${(
-                                            (this.chartData[index].data[0].value /
-                                                (this.chartData[index].data[0].value +
-                                                    this.chartData[index].data[1].value)) *
-                                            100
-                                        ).toFixed(2)}%`,
-                                    },
-                                },
-                            ],
-                        });
-                    });
-                } catch (e) {
-                    console.error(e, data);
-                    this.$message.warning(e);
+        async fetchStatisticData() {
+            try {
+                const data = await fetchHistory('monitor');
+                if (data) {
+                    this.handleStatisticData(data);
                 }
-            } else {
-                this.$message.warning(`返回数据为空!`);
+            } catch (error) {
+                console.error('Error fetching statistic data:', error);
             }
         },
-        handleTaskComplete() {
-            this.loading = false;
+        handleStatisticData(data) {
+            if (!data || !data.history || data.history.length === 0) {
+                ElMessage.warning('暂无历史数据');
+                return;
+            }
+
+            try {
+                const history = data.history;
+                const currentRecord = history[history.length - 1];
+                const lastRecord = history.length > 1 ? history[history.length - 2] : null;
+
+                const currentEUStored = currentRecord.results.eu_stored;
+                const currentTotalWirelessEU = currentRecord.results.total_wireless_eu;
+
+                if (lastRecord && lastRecord.results.eu_stored) {
+                    const lastEUStored = lastRecord.results.eu_stored;
+                    this.statistic.EUStored.change = (currentEUStored - lastEUStored) / lastEUStored;
+                } else {
+                    this.statistic.EUStored.change = 0;
+                }
+                this.EUStoredValue = currentEUStored;
+
+                if (lastRecord && lastRecord.results.total_wireless_eu) {
+                    const lastTotalWirelessEU = lastRecord.results.total_wireless_eu;
+                    this.statistic.totalWirelessEU.change = (currentTotalWirelessEU - lastTotalWirelessEU) / lastTotalWirelessEU;
+                } else {
+                    this.statistic.totalWirelessEU.change = 0;
+                }
+                this.totalWirelessEUValue = currentTotalWirelessEU;
+
+            } catch (e) {
+                console.error('Error parsing statistic data:', e, data);
+                ElMessage.warning('数据解析失败');
+            }
+        },
+        async fetchChartData() {
+            this.chartLoading = true;
+            try {
+                let startTime, endTime;
+                
+                if (this.timeRange === 'custom') {
+                    // 使用自定义时间范围
+                    if (!this.customStartTime || !this.customEndTime) {
+                        this.chartLoading = false;
+                        return;
+                    }
+                    startTime = this.customStartTime;
+                    endTime = this.customEndTime;
+                } else {
+                    // 使用预设时间范围
+                    endTime = Math.floor(Date.now() / 1000);
+                    startTime = endTime - this.timeRange * 3600;
+                }
+
+                const data = await fetchHistory('monitor', {
+                    start_time: startTime,
+                    end_time: endTime,
+                });
+
+                if (data && data.history && data.history.length > 0) {
+                    this.chartHistoryData = data.history;
+                } else {
+                    this.chartHistoryData = [];
+                }
+            } catch (error) {
+                console.error('Error fetching chart data:', error);
+                this.chartHistoryData = [];
+            } finally {
+                this.chartLoading = false;
+            }
         },
     },
     mounted() {
-        this.startPolling("monitor");
-        this.initCharts();
-        window.addEventListener('resize', this.resizeCharts);
-    },
-    beforeUnmount() {
-        window.removeEventListener('resize', this.resizeCharts);
-        this.chartInstances.forEach(chart => chart.dispose());
+        this.refreshAll();
     },
 };
 </script>
@@ -426,45 +238,22 @@ export default {
     gap: 20px;
 }
 
-.statistic-container .el-statistic {
+.statistic-container > * {
     flex: 1 1 20%;
     min-width: 300px;
-    /* text-align: center; */
-}
-
-.chart-container {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-around;
-    gap: 20px;
-}
-
-.chart {
-    flex: 1 1 20%;
-    min-width: 200px;
-    height: 300px;
 }
 
 @media (max-width: 1400px) {
-    .statistic-container .el-statistic {
-        flex: 1 1 45%;
-    }
-
-    .chart {
+    .statistic-container > * {
         flex: 1 1 45%;
     }
 }
 
 @media (max-width: 900px) {
-    .statistic-container .el-statistic {
-        flex: 1 1 100%;
-    }
-
-    .chart {
+    .statistic-container > * {
         flex: 1 1 100%;
     }
 }
-
 
 :global(h2#card-usage ~ .example .example-showcase) {
     background-color: var(--el-fill-color) !important;
@@ -472,54 +261,5 @@ export default {
 
 .el-statistic {
     --el-statistic-content-font-size: 28px;
-}
-
-.statistic-card {
-    height: 100%;
-    padding: 40px;
-    border-radius: 4px;
-    background-color: var(--el-bg-color-overlay);
-}
-
-.statistic-title {
-    font-size: 16px;
-}
-
-.statistic-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    font-size: 12px;
-    color: var(--el-text-color-regular);
-    margin-top: 16px;
-}
-
-.statistic-footer .footer-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.statistic-footer .footer-item span:last-child {
-    display: inline-flex;
-    align-items: center;
-    margin-left: 4px;
-}
-
-.green {
-    color: var(--el-color-success);
-}
-
-.red {
-    color: var(--el-color-error);
-}
-</style>
-
-<style>
-html.dark {
-    .statistic-card {
-        background: none;
-    }
 }
 </style>
