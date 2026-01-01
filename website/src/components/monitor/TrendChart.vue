@@ -1,7 +1,27 @@
 <template>
     <div class="trend-card">
         <div class="trend-header">
-            <h3 class="trend-title">历史趋势</h3>
+            <h3 class="trend-title">
+                历史趋势
+                <el-tooltip effect="dark" placement="top">
+                    <template #content>
+                        <div style="line-height: 1.8;">
+                            <div><b>数字单位说明：</b></div>
+                            <div>K = 千 (10³)</div>
+                            <div>M = 百万 (10⁶)</div>
+                            <div>G = 十亿 (10⁹)</div>
+                            <div>T = 万亿 (10¹²)</div>
+                            <div>P = 千万亿 (10¹⁵)</div>
+                            <div>E = 百京 (10¹⁸)</div>
+                            <div>Z = 十垓 (10²¹)</div>
+                            <div>Y = 千穰 (10²⁴)</div>
+                        </div>
+                    </template>
+                    <el-icon style="margin-left: 6px; cursor: help;" :size="14">
+                        <QuestionFilled />
+                    </el-icon>
+                </el-tooltip>
+            </h3>
             <div class="trend-controls">
                 <div class="control-item">
                     <span class="control-label">时间范围</span>
@@ -10,8 +30,22 @@
                         <el-option label="近4小时" :value="4" />
                         <el-option label="近12小时" :value="12" />
                         <el-option label="近1天" :value="24" />
+                        <el-option label="近3天" :value="72" />
                         <el-option label="近7天" :value="168" />
+                        <el-option label="自定义" value="custom" />
                     </el-select>
+                </div>
+                <div class="control-item" v-if="timeRangeValue === 'custom'">
+                    <el-date-picker
+                        v-model="customTimeRangeLocal"
+                        type="datetimerange"
+                        range-separator="至"
+                        start-placeholder="开始时间"
+                        end-placeholder="结束时间"
+                        size="small"
+                        :shortcuts="dateShortcuts"
+                        @change="handleCustomTimeChange"
+                    />
                 </div>
                 <div class="control-item">
                     <span class="control-label">时间粒度</span>
@@ -39,8 +73,12 @@
 <script>
 import * as echarts from 'echarts'
 import { useDark } from '@vueuse/core'
+import { QuestionFilled } from '@element-plus/icons-vue'
 
 export default {
+    components: {
+        QuestionFilled,
+    },
     name: 'TrendChart',
     props: {
         historyData: {
@@ -48,20 +86,30 @@ export default {
             default: () => [],
         },
         timeRange: {
-            type: Number,
+            type: [Number, String],
             default: 4,
         },
         granularity: {
             type: String,
             default: 'none',
         },
+        customStartTime: {
+            type: Number,
+            default: null,
+        },
+        customEndTime: {
+            type: Number,
+            default: null,
+        },
         loading: {
             type: Boolean,
             default: false,
         },
     },
-    emits: ['update:timeRange', 'update:granularity'],
+    emits: ['update:timeRange', 'update:granularity', 'update:customStartTime', 'update:customEndTime'],
     data() {
+        const now = new Date();
+        const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 3600 * 1000);
         return {
             chartInstances: {
                 euStored: null,
@@ -71,6 +119,33 @@ export default {
                 euStored: { max: null, min: null, avg: null },
                 wirelessEU: { max: null, min: null, avg: null },
             },
+            customTimeRangeLocal: [threeDaysAgo, now],
+            dateShortcuts: [
+                {
+                    text: '最近1天',
+                    value: () => {
+                        const end = new Date();
+                        const start = new Date(end.getTime() - 24 * 3600 * 1000);
+                        return [start, end];
+                    },
+                },
+                {
+                    text: '最近3天',
+                    value: () => {
+                        const end = new Date();
+                        const start = new Date(end.getTime() - 3 * 24 * 3600 * 1000);
+                        return [start, end];
+                    },
+                },
+                {
+                    text: '最近7天',
+                    value: () => {
+                        const end = new Date();
+                        const start = new Date(end.getTime() - 7 * 24 * 3600 * 1000);
+                        return [start, end];
+                    },
+                },
+            ],
         };
     },
     computed: {
@@ -115,11 +190,22 @@ export default {
         },
     },
     methods: {
-        handleTimeRangeChange() {
-            // 父组件会响应 v-model 更新并重新获取数据
+        handleTimeRangeChange(val) {
+            // 当切换到自定义时，自动应用默认的自定义时间范围
+            if (val === 'custom') {
+                this.handleCustomTimeChange(this.customTimeRangeLocal);
+            }
         },
         handleGranularityChange() {
             // 父组件会响应 v-model 更新并重新获取数据
+        },
+        handleCustomTimeChange(val) {
+            if (val && val.length === 2) {
+                const startTime = Math.floor(val[0].getTime() / 1000);
+                const endTime = Math.floor(val[1].getTime() / 1000);
+                this.$emit('update:customStartTime', startTime);
+                this.$emit('update:customEndTime', endTime);
+            }
         },
         initCharts() {
             const textColor = this.isDark ? '#E5EAF3' : '#1a1a1a';
@@ -343,6 +429,8 @@ export default {
         },
         formatLargeNumber(num) {
             if (num === null || num === undefined) return '-';
+            if (num >= 1e24) return (num / 1e24).toFixed(2) + 'Y';
+            if (num >= 1e21) return (num / 1e21).toFixed(2) + 'Z';
             if (num >= 1e18) return (num / 1e18).toFixed(2) + 'E';
             if (num >= 1e15) return (num / 1e15).toFixed(2) + 'P';
             if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';

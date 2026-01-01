@@ -19,6 +19,8 @@
         :historyData="chartHistoryData"
         v-model:timeRange="timeRange"
         v-model:granularity="granularity"
+        v-model:customStartTime="customStartTime"
+        v-model:customEndTime="customEndTime"
         :loading="chartLoading"
     />
 
@@ -68,6 +70,8 @@ export default {
             // 图表相关
             timeRange: 4, // 默认4小时
             granularity: 'none', // 默认无粒度
+            customStartTime: null, // 自定义开始时间（Unix时间戳）
+            customEndTime: null, // 自定义结束时间（Unix时间戳）
             chartHistoryData: [],
             chartLoading: false,
         };
@@ -82,7 +86,7 @@ export default {
         }
 
         const formatNumber = (num) => {
-            return parseInt(num.value).toLocaleString()
+            return num.value.toLocaleString('zh-CN', { maximumFractionDigits: 0 })
         }
 
         const isDark = useDark()
@@ -96,13 +100,28 @@ export default {
         }
     },
     watch: {
-        timeRange() {
-            this.fetchChartData();
+        timeRange(newVal) {
+            // 如果不是自定义模式，则直接获取数据
+            if (newVal !== 'custom') {
+                this.fetchChartData();
+            }
         },
         granularity() {
             // granularity 变化时触发图表组件内部重新处理数据
             // 由于 historyData 没变，需要重新获取以触发处理
             this.fetchChartData();
+        },
+        customStartTime() {
+            // 自定义时间变化时重新获取数据
+            if (this.timeRange === 'custom') {
+                this.fetchChartData();
+            }
+        },
+        customEndTime() {
+            // 自定义时间变化时重新获取数据
+            if (this.timeRange === 'custom') {
+                this.fetchChartData();
+            }
         },
     },
     methods: {
@@ -165,12 +184,25 @@ export default {
         async fetchChartData() {
             this.chartLoading = true;
             try {
-                const now = Math.floor(Date.now() / 1000);
-                const startTime = now - this.timeRange * 3600;
+                let startTime, endTime;
+                
+                if (this.timeRange === 'custom') {
+                    // 使用自定义时间范围
+                    if (!this.customStartTime || !this.customEndTime) {
+                        this.chartLoading = false;
+                        return;
+                    }
+                    startTime = this.customStartTime;
+                    endTime = this.customEndTime;
+                } else {
+                    // 使用预设时间范围
+                    endTime = Math.floor(Date.now() / 1000);
+                    startTime = endTime - this.timeRange * 3600;
+                }
 
                 const data = await fetchHistory('monitor', {
                     start_time: startTime,
-                    end_time: now,
+                    end_time: endTime,
                 });
 
                 if (data && data.history && data.history.length > 0) {
