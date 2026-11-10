@@ -1,10 +1,11 @@
 import uuid
+import json
 import requests
 from utils.utils import READY
 from utils.task import task_manager
 
 
-def craft_item(client_id, item_name, item_damage, item_amount=1, cpu_name=None, label=None):
+def craft_item(client_id, item_name, item_damage=None, item_amount=1, cpu_name=None, label=None, stack_type="item"):
     """
     请求合成物品
     :param item_name: 物品名称
@@ -12,13 +13,25 @@ def craft_item(client_id, item_name, item_damage, item_amount=1, cpu_name=None, 
     :param item_amount: 物品数量
     :param cpu_name: CPU 名称
     :param label: 标签
+    :param stack_type: AE2 存储类型（item 或 fluid）
     """
 
-    if cpu_name:
-        command = f"return ae.requestItem('{item_name}', {item_damage}, {item_amount}, '{cpu_name}', '{label}')" if label else f"return ae.requestItem('{item_name}', {item_damage}, {item_amount}, '{cpu_name}')"
+    def lua_string(value):
+        return json.dumps(str(value), ensure_ascii=False)
+
+    item_amount = int(item_amount)
+    if stack_type == "fluid":
+        cpu_argument = f", {lua_string(cpu_name)}" if cpu_name else ""
+        command = f"return ae.requestFluid({lua_string(item_name)}, {item_amount}{cpu_argument})"
     else:
-        command = f"return ae.requestItem('{item_name}', {item_damage}, {item_amount}, nil, '{label}')" if label else f"return ae.requestItem('{item_name}', {item_damage}, {item_amount})"
-    
+        item_damage = int(item_damage or 0)
+        cpu_argument = lua_string(cpu_name) if cpu_name else "nil"
+        label_argument = f", {lua_string(label)}" if label else ""
+        command = (
+            f"return ae.requestItem({lua_string(item_name)}, {item_damage}, "
+            f"{item_amount}, {cpu_argument}{label_argument})"
+        )
+
     task_id = str(uuid.uuid4())
 
     task_manager.add_task(
@@ -55,4 +68,3 @@ def send_http_request(method: str, url: str, headers=None, params=None, data=Non
         return res.text
     except Exception as e:
         return str(e)
-    

@@ -18,11 +18,27 @@ end
 
 ae = {}
 
+local ITEM_STACK = "item"
+local FLUID_STACK = "fluid"
 
-local function parseItem(items)
+local function inferStackType(stack)
+    if stack and stack.stackType then return stack.stackType end
+    if stack and stack.damage ~= nil then return ITEM_STACK end
+    return FLUID_STACK
+end
+
+local function tagStack(stack, stackType)
+    if stack ~= nil then
+        stack.stackType = stackType or inferStackType(stack)
+    end
+    return stack
+end
+
+local function parseStacks(items, stackType)
     if items == nil then return nil end
     local data = {}
     for i, item in pairs(items) do
+        tagStack(item, stackType)
         if item.hasTag and item.tag ~= nil then
             item.tag = base64.encode(item.tag)
         end
@@ -46,21 +62,23 @@ local function getSimpleInfo(cpu)
     }
 end
 
-local function simpleItemInfo(item)
+local function simpleStackInfo(item, stackType)
     if item == nil then return nil end
     return {
         name = item.name,
         label = item.label,
         damage = item.damage,
         size = item.size,
-        isCraftable = item.isCraftable
+        amount = item.amount,
+        isCraftable = item.isCraftable,
+        stackType = stackType or inferStackType(item)
     }
 end
 
 local function simpleItemsInfo(items)
     if items == nil then return end
     for i, item in pairs(items) do
-        items[i] = simpleItemInfo(item)
+        items[i] = simpleStackInfo(item)
         if i % 50 == 0 then
             os.sleep(0)
         end
@@ -73,7 +91,7 @@ local function removeEmptyItem(items)
     local newOne = {}
     for i, item in pairs(items) do
         if item.size ~= nil and item.size ~= 0 or item.amount ~= nil and item.amount ~= 0 then
-            table.insert(newOne, simpleItemInfo(item))
+            table.insert(newOne, simpleStackInfo(item))
         end
         if i % 50 == 0 then
             os.sleep(0)
@@ -87,7 +105,7 @@ local function getDetailInfo(cpu)
     local result = {
         activeItems = removeEmptyItem(sub.activeItems()),
         -- fix: 当itme存在tag时，编码错误
-        finalOutput = simpleItemInfo(sub.finalOutput()),
+        finalOutput = simpleStackInfo(sub.finalOutput()),
         active = sub.isActive(),
         busy = sub.isBusy(),
         pendingItems = removeEmptyItem(sub.pendingItems()),
@@ -142,34 +160,19 @@ function ae.getCpuDetail(cpuName)
     return { message = "no cpus" }
 end
 
-function ae.requestItem(name, damage, amount, cpuName, label)
-    -- 请求合成指定的物品
-    -- 参数:
-    -- name (string): 要合成物品的名称
-    -- damage (int): 物品的损坏值
-    -- amount (int, 可选): 要合成的物品数量，默认值为1
-    -- cpuName (string, 可选): 用于执行任务的CPU名称，若为空则系统自动选择
-    -- label (string, 可选): 物品的标签，用于区分不同的流体液滴
-    if not name or not damage then
-        return { message = "物品信息为空" }
-    end
-
+local function requestStack(stackType, details, amount, cpuName)
     local craftable
-    if label then
-        craftable = me.getCraftables({
-            name = name,
-            damage = damage,
-            label = label
-        })[1]
-    else
-        craftable = me.getCraftables({
-            name = name,
-            damage = damage
-        })[1]
+    if stackType ~= ITEM_STACK or not details.label then
+        craftable = me.getCraftable(details, stackType)
+    end
+    if stackType == ITEM_STACK and not craftable then
+        -- Filtered lookup preserves labels and finds NBT outputs without a tag in details.
+        local craftables = me.getCraftables(details)
+        craftable = craftables and craftables[1]
     end
 
     if not craftable then
-        return { message = "没有找到指定的物品" }
+        return { message = "没有找到指定的合成配方" }
     end
 
     amount = amount or 1
@@ -197,7 +200,7 @@ function ae.requestItem(name, damage, amount, cpuName, label)
     end
 
     local res = {
-        item = craftable.getItemStack(),
+        stack = tagStack(craftable.getStack(), stackType),
         failed = result.hasFailed() or false,
         computing = result.isComputing() or false,
         done = { result = false, why = nil },
@@ -210,13 +213,44 @@ function ae.requestItem(name, damage, amount, cpuName, label)
     return { message = "success", data = res }
 end
 
+function ae.requestItem(name, damage, amount, cpuName, label)
+    -- GTNH 2.9 / OpenComputers 1.12 使用带类型的 AE2 合成 API。
+    if not name or damage == nil then
+        return { message = "物品信息为空" }
+    end
+
+    local details = { name = name, damage = damage }
+    if label then details.label = label end
+    return requestStack(ITEM_STACK, details, amount, cpuName)
+end
+
+function ae.requestFluid(name, amount, cpuName)
+    if not name then
+        return { message = "流体信息为空" }
+    end
+    return requestStack(FLUID_STACK, { name = name }, amount, cpuName)
+end
+
 function ae.getAllSilempleItems(filter)
-    -- 获取所有物品简单信息
+    -- 保留旧函数名，并在 2.9 中同时返回物品和原生 AE2 流体。
     local items = me.getItemsInNetwork(filter)
     local newOne = {}
     for i, item in pairs(items) do
         if item.size ~= nil or item.amount ~= nil then
-            table.insert(newOne, simpleItemInfo(item))
+            table.insert(newOne, simpleStackInfo(item, ITEM_STACK))
+        end
+        if i % 50 == 0 then
+            os.sleep(0)
+        end
+    end
+    -- An item filter must not include unrelated native fluids.
+    if filter ~= nil then
+        return { message = "success", data = newOne }
+    end
+    local fluids = me.getFluidsInNetwork()
+    for i, fluid in pairs(fluids or {}) do
+        if fluid.size ~= nil or fluid.amount ~= nil then
+            table.insert(newOne, simpleStackInfo(fluid, FLUID_STACK))
         end
         if i % 50 == 0 then
             os.sleep(0)
@@ -226,45 +260,51 @@ function ae.getAllSilempleItems(filter)
 end
 
 function ae.getAllItems(filter)
-    -- 获取所有物品信息
+    -- 2.9 将流体提升为 AE2 原生存储类型，因此一起返回供网页统一展示。
     local items = me.getItemsInNetwork(filter)
-    return { message = "success", data = parseItem(items) }
+    local data = parseStacks(items, ITEM_STACK) or {}
+    if filter ~= nil then
+        return { message = "success", data = data }
+    end
+    local fluids = parseStacks(me.getFluidsInNetwork(), FLUID_STACK) or {}
+    for _, fluid in pairs(fluids) do
+        table.insert(data, fluid)
+    end
+    return { message = "success", data = data }
 end
 
 function ae.getAllFluids()
     -- 获取所有流体信息
     local fluids = me.getFluidsInNetwork()
-    return { message = "success", data = parseItem(fluids) }
+    return { message = "success", data = parseStacks(fluids, FLUID_STACK) }
 end
 
 function ae.getAllEssentia()
     -- 获取所有源质信息
     local essentia = me.getEssentiaInNetwork()
-    return { message = "success", data = parseItem(essentia) }
+    return { message = "success", data = parseStacks(essentia) }
 end
 
 function ae.getAllCraftables()
     -- 获取所有可合成的物品
 
-    local items = me.getItemsInNetwork()
-    if not items then return { message = "not items" } end
+    local craftables = me.getCraftables()
+    if not craftables then return { message = "not craftables" } end
 
     local result = {}
-    for _, item in pairs(items) do
-    if item.isCraftable then
-        local entry = {
-            name = item.name,
-            label = item.label,
-            size = item.size,
-            damage = item.damage
-        }
-        
-        if item.hasTag and item.tag ~= nil then
-            entry.hasTag = true
-            entry.tag = base64.encode(item.tag)
+    for i, craftable in pairs(craftables) do
+        local stack = craftable.getStack()
+        if stack then
+            local stackType = inferStackType(stack)
+            local entry = simpleStackInfo(stack, stackType)
+            if stack.hasTag and stack.tag ~= nil then
+                entry.hasTag = true
+                entry.tag = base64.encode(stack.tag)
+            end
+            table.insert(result, entry)
         end
-        
-        table.insert(result, entry)
+        if i % 50 == 0 then
+            os.sleep(0)
         end
     end
 

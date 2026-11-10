@@ -186,21 +186,29 @@ const localTask = {
     }
 }
 
-const createCraftTask = (itemName, ItemDamage, amount = 1, cpuName, label, callback, cpuCallback) => {
+const createCraftTask = (stackType, itemName, itemDamage, amount = 1, cpuName, label, callback, cpuCallback) => {
     let command = undefined;
-    // ae.requestItem(name, damage, amount, cpuName, label) lua
-    if (cpuName) {
-        if (label) {
-            command = `return ae.requestItem('${itemName}', ${ItemDamage}, ${amount}, '${cpuName}', '${label}')`
-        } else {
-            command = `return ae.requestItem('${itemName}', ${ItemDamage}, ${amount}, '${cpuName}')`
-        }
+    const luaString = (value) => JSON.stringify(String(value));
+    const requestedAmount = Number(amount);
+
+    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+        ElMessage.error('下单数量必须是正数');
+        return;
+    }
+
+    if (stackType === 'fluid') {
+        command = cpuName
+            ? `return ae.requestFluid(${luaString(itemName)}, ${requestedAmount}, ${luaString(cpuName)})`
+            : `return ae.requestFluid(${luaString(itemName)}, ${requestedAmount})`;
     } else {
-        if (label) {
-            command = `return ae.requestItem('${itemName}', ${ItemDamage}, ${amount}, nil, '${label}')`
-        } else {
-            command = `return ae.requestItem('${itemName}', ${ItemDamage}, ${amount})`
+        const requestedDamage = Number(itemDamage ?? 0);
+        if (!Number.isFinite(requestedDamage)) {
+            ElMessage.error('物品 damage 无效');
+            return;
         }
+        const cpuArgument = cpuName ? luaString(cpuName) : 'nil';
+        const labelArgument = label ? `, ${luaString(label)}` : '';
+        command = `return ae.requestItem(${luaString(itemName)}, ${requestedDamage}, ${requestedAmount}, ${cpuArgument}${labelArgument})`;
     }
 
     let commands = [command];

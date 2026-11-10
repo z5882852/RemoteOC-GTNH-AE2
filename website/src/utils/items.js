@@ -5,7 +5,14 @@ import Setting from '@/utils/setting';
 const itemUtil = {
     items: null,
     fluids: null,
-    version: "2.8.0",
+    version: "2.9.0-beta-3",
+    // The bundled lookup database is only used for translated names and icons.
+    // Unknown 2.9 entries fall back to the live label returned by OpenComputers.
+    assetVersion: "2.8.0",
+
+    getAssetVersionKey() {
+        return this.assetVersion.replace(/\./g, "");
+    },
 
     loadWithProgress(url, progressCallback) {
         axios.get(url, {
@@ -25,7 +32,7 @@ const itemUtil = {
 
     loadItems(progressCallback) {
         if (!this.items) {
-            let url = (Setting.get("resourceUrl")) + `/items_GTNH${this.version.replace(/\./g, "")}.json`;
+            let url = (Setting.get("resourceUrl")) + `/items_GTNH${this.getAssetVersionKey()}.json`;
             if (Setting.get("useGzip")) {
                 url += ".gz";
             }
@@ -56,7 +63,7 @@ const itemUtil = {
 
     loadFluids(progressCallback) {
         if (!this.fluids) {
-            let url = (Setting.get("resourceUrl")) + `/fluids_GTNH${this.version.replace(/\./g, "")}.json`;
+            let url = (Setting.get("resourceUrl")) + `/fluids_GTNH${this.getAssetVersionKey()}.json`;
             if (Setting.get("useGzip")) {
                 url += ".gz";
             }
@@ -86,7 +93,11 @@ const itemUtil = {
     },
 
     isItem: (obj) => {
-        return obj && obj["name"] && obj["damage"] !== null;
+        return obj && obj["name"] && obj.stackType !== "fluid" && obj["damage"] !== null;
+    },
+
+    isFluid: (obj) => {
+        return obj && (obj.stackType === "fluid" || obj.name === "ae2fc:fluid_drop");
     },
 
     getItem(obj) {
@@ -105,6 +116,10 @@ const itemUtil = {
     },
 
     getName(item, originItem, data) {
+        if (originItem.stackType === "fluid") {
+            const fluid = this.fluids && this.fluids[originItem.name];
+            return fluid && fluid.zh ? fluid.zh : originItem.label;
+        }
         if (item) {
             let name = item && item.zh ? item.zh : originItem.label;
             if (originItem.name === "ae2fc:fluid_drop") {
@@ -137,8 +152,11 @@ const itemUtil = {
     },
 
     getFluidIcon: (data) => {
-        // name必为ae2fc:fluid_drop
         if (data) {
+            if (data.stackType === "fluid" && data.name) {
+                return "img/fluids/" + data.name + ".png";
+            }
+            // Legacy AE2FC fluid drop.
             if (data.tag) {
                 try {
                     let tag = JSON.parse(data.tag);

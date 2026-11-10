@@ -1,0 +1,35 @@
+RemoteOC-GTNH-AE2 — GTNH 2.9 port
+
+Original project:
+  Copyright (c) 2024 z5882852
+  https://github.com/z5882852/RemoteOC-GTNH-AE2
+
+GTNH 2.9 port modifications:
+  Copyright (c) 2026 Jesse-njx
+  https://github.com/Jesse-njx
+
+The project code is distributed under the MIT License in LICENSE. The original
+copyright and permission notice have been retained.
+
+Bundled third-party code:
+
+- client/lib/json.lua is based on rxi/json.lua and retains its MIT notice.
+- client/lib/json2.lua identifies code adapted from
+  https://github.com/52871299hzy/opencomputer-monitor (MIT).
+- website/src/utils/nbt.js is derived from NBT.js by Sijmen Mulder and retains
+  its public-domain dedication.
+- JavaScript packages installed from website/package-lock.json remain subject
+  to their respective licenses recorded in that lockfile and package metadata.
+
+Game data and artwork:
+
+The files under website/public/img and the GTNH item/fluid JSON databases were
+already present in the upstream project and were exported from a modded GTNH
+installation for identification and interoperability. Copyright and trademark
+rights in Minecraft, GT New Horizons, individual mods, item names, and artwork
+remain with their respective owners. Those assets are not relicensed by the
+project's MIT License. Anyone redistributing an image/data bundle separately,
+especially commercially, should review the licenses of the originating mods.
+
+This project is an unofficial community tool and is not endorsed by Mojang,
+Microsoft, the GT New Horizons team, or the authors of the included mods.

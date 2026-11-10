@@ -145,9 +145,7 @@ export default {
 </style>
 
 <style>
-html.dark {
-    .statistic-card {
-        background: none;
-    }
+html.dark .statistic-card {
+    background: none;
 }
 </style>

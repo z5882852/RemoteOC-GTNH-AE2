@@ -75,7 +75,7 @@
                             <div class="item-info">
                                 <div class="ellipsis" :title="item.title" v-html="parseLineColorCode(item.title)"></div>
                                 <div class="words" :title="item.label" v-html="parseLineColorCode(item.label)"></div>
-                                <div class="words">数量:
+                                <div class="words">{{ item.data.stackType === 'fluid' ? '数量 (mB):' : '数量:' }}
                                     <NumberFormat :number="item.size" />
                                 </div>
                                 <div v-if="item.isCraftable"><el-tag size="small" type="success">可合成</el-tag></div>
@@ -90,8 +90,8 @@
                                             {{ info }}
                                         </div>
                                         <div class="words copy-container"
-                                            @click="copyToClipboard(`${item.data.name}:${item.data.damage}`)">{{
-                                                item.data.name }}:{{ item.data.damage }}</div>
+                                            @click="copyToClipboard(item.data.damage == null ? item.data.name : `${item.data.name}:${item.data.damage}`)">{{
+                                                item.data.name }}{{ item.data.damage == null ? '' : `:${item.data.damage}` }}</div>
                                         <div style="font-size: 12px; color: #aaa;">其他属性</div>
                                         <div v-for="(value, key, index) in item.data" :key="index"
                                             :title="typeof value === 'object' ? JSON.stringify(value) : value"
@@ -109,7 +109,7 @@
                                         下单制作
                                     </template>
                                     <el-icon size="large" class="craft-icon"
-                                        @click="openCraftDialog(item.title, item.data.name, item.data.damage, item.label)">
+                                        @click="openCraftDialog(item)">
                                         <GoodsFilled />
                                     </el-icon>
                                 </el-tooltip>
@@ -204,6 +204,7 @@ export default {
             craft: {
                 name: null,
                 damage: null,
+                stackType: "item",
                 amount: 1,
                 label: null,
                 btnLoading: false,
@@ -264,7 +265,7 @@ export default {
                             })
                         }
                         let item_ = itemUtil.getItem(item)
-                        if (isShowLiquidImage && data.name === "ae2fc:fluid_drop") {
+                        if (isShowLiquidImage && itemUtil.isFluid(data)) {
                             image = itemUtil.getFluidIcon(data)
                         } else {
                             image = itemUtil.getItemIcon(item_)
@@ -347,12 +348,13 @@ export default {
                 });
             }
         },
-        openCraftDialog(title, name, damage, label) {
-            this.craft.name = name;
-            this.craft.damage = damage;
+        openCraftDialog(item) {
+            this.craft.name = item.data.name;
+            this.craft.damage = item.data.damage;
+            this.craft.stackType = item.data.stackType || "item";
             this.craft.amount = 1;
-            this.craft.label = label;
-            this.craftDialogTitle = "下单-" + title;
+            this.craft.label = item.label;
+            this.craftDialogTitle = "下单-" + item.title;
             this.showCraftDialog = true;
         },
         craftItem() {
@@ -361,9 +363,10 @@ export default {
             let amount = this.craft.amount;
             let cpuName = this.craft.selectCpu;
             let label = name === "ae2fc:fluid_drop" ? this.craft.label : null;
+            let stackType = this.craft.stackType;
             this.craft.btnLoading = true;
-            console.log("craft：", name, damage, amount, cpuName, label)
-            createCraftTask(name, damage, amount, cpuName, label, (data) => {
+            console.log("craft：", stackType, name, damage, amount, cpuName, label)
+            createCraftTask(stackType, name, damage, amount, cpuName, label, (data) => {
                 this.craft.btnLoading = false;
                 this.showCraftDialog = false;
             }, (cpuResult) => {
@@ -377,9 +380,9 @@ export default {
                 filteredItems = filteredItems.filter(item => item.isCraftable);
             }
             if (this.showLiquid === "物品") {
-                filteredItems = filteredItems.filter(item => item.data.name !== "ae2fc:fluid_drop");
+                filteredItems = filteredItems.filter(item => !itemUtil.isFluid(item.data));
             } else if (this.showLiquid === "液体") {
-                filteredItems = filteredItems.filter(item => item.data.name === "ae2fc:fluid_drop");
+                filteredItems = filteredItems.filter(item => itemUtil.isFluid(item.data));
             }
 
             if (this.searchText) {

@@ -5,7 +5,7 @@
 </p>
 
 <h1 align="center" style="font-size: 38px;">赛博监工</h1>
-<h3 align="center">AE2 Control for GTNH 2.8.0</h3>
+<h3 align="center">AE2 Control for GTNH 2.9.0-beta-3</h3>
 
 
 ## 简介
@@ -14,6 +14,22 @@
 
 
 该项目基于[RemoteOC](https://github.com/z5882852/RemoteOC)框架开发，需要一台**可公网访问的主机**作为服务器，以及一台或多台OpenComputers电脑作为客户端。
+
+## GTNH 2.9 兼容性
+
+此分支面向 **GTNH 2.9.0-beta-3**，对应以下关键模组版本：
+
+- Applied Energistics 2: `rv3-beta-1050-GTNH`
+- AE2 Fluid Crafting: `1.5.106-gtnh`
+- OpenComputers: `1.12.61-GTNH`
+
+2.9 的 OpenComputers/AE2 接口将合成结果从 `getItemStack()` 改为 `getStack()`，并将流体作为原生 AE2 存储与合成类型。本分支会统一列出物品和原生流体，并支持直接按 mB 下单流体。
+
+> 仓库中随附的 2.8 物品/流体数据库只用于中文名和图标。2.9 新增条目会自动使用游戏实时返回的名称和默认图标，不影响查询或下单。
+
+完整的版本对照和 API 迁移记录见 [PORTING.md](PORTING.md)。
+
+本项目最初由 [z5882852](https://github.com/z5882852) 发布；GTNH 2.9 移植由 [Jesse-njx](https://github.com/Jesse-njx) 贡献。代码使用 [MIT License](LICENSE)，第三方代码、GTNH 数据与游戏图标的归属说明见 [NOTICE](NOTICE)。
 
 
 ## 功能
@@ -49,31 +65,37 @@ website/   # 网页前端
 
 1. **准备工作**
 
-    - 安装`Docker`和`Docker Compose`
-    - 下载仓库中的`docker-compose.yml`和`server/.env`文件
+    - 安装 `Git`、`Docker` 和 `Docker Compose`（2.24.0 或更新版本）
+    - 克隆完整仓库并进入项目根目录；Compose 会使用 `website/` 和 `server/` 中的源码及 Dockerfile 构建镜像
+
+    ```bash
+    git clone https://github.com/z5882852/RemoteOC-GTNH-AE2.git
+    cd RemoteOC-GTNH-AE2
+    ```
 
 2. **修改配置**
 
     - 根据想要修改`docker-compose.yml`文件中的环境变量
-    - 修改`.env`文件中的环境变量
+    - 执行 `cp server/.env.example server/.env`
+    - 为 `SERVER_TOKEN` 生成并填写一个唯一的长随机令牌，并在 OC 客户端使用同一令牌
 
 3. **启动服务**
 
     ```bash
-    docker-compose up -d
+    docker compose up -d --build
     ```
     > 默认前端端口为`80`，可直接访问，后端端口为`8080`，可在`docker-compose.yml`中修改
   
 4. **查看日志**
 
     ```bash
-    docker-compose logs -f
+    docker compose logs -f
     ```
 
 5. **停止服务**
 
     ```bash
-    docker-compose down
+    docker compose down
     ```
 
 ### 手动构建后端 Docker 镜像
@@ -94,19 +116,28 @@ website/   # 网页前端
      cd RemoteOC-GTNH-AE2/server
      ```
 
-3. **构建镜像**
+3. **配置认证令牌**
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    - 将 `.env` 中的 `SERVER_TOKEN` 替换为唯一的长随机令牌，并在 OC 客户端使用同一令牌
+    - `.env` 通过运行参数注入容器，不会打包进镜像
+
+4. **构建镜像**
 
     ```bash
     docker build -t roc-gtnh-backend .
     ```
 
-4. **运行容器**
+5. **运行容器**
 
     ```bash
-    docker run -d --name roc-gtnh-backend -p 8080:8080 roc-gtnh-backend
+    docker run -d --name roc-gtnh-backend --env-file .env -p 8080:8080 roc-gtnh-backend
     ```
 
-5. **查看日志**
+6. **查看日志**
 
     ```bash
     docker logs -f roc-gtnh-backend
@@ -138,7 +169,8 @@ website/   # 网页前端
 
 4. **修改配置**
 
-    - 根据需要修改`.env`文件中的环境变量
+    - 执行 `cp .env.example .env`
+    - 修改 `.env` 中的环境变量，务必替换默认的 `SERVER_TOKEN`
     - 根据需要修改`config.py`文件中的配置
 
 5. **运行服务**
@@ -229,7 +261,7 @@ website/   # 网页前端
 如果您希望快速部署前端，可直接使用打包好的文件，无需进行源码构建。
 
 1. **下载 Releases 文件**
-   - 访问项目的 Releases 页面：[🔗 **GitHub Releases**](https://github.com/z5882852/RemoteOC-GTNH-AE2/releases)
+   - 访问项目的 [Releases 页面](https://github.com/z5882852/RemoteOC-GTNH-AE2/releases)
    - 下载最新版本的 `RemoteOC_frontend-x.x.x_GTNH-2.x.0.tar.gz` 文件（或类似文件名的构建包）。
 
 2. **上传到服务器**
@@ -245,7 +277,7 @@ website/   # 网页前端
 
 #### **3. 克隆源码并构建再部署**
 1. **环境要求**
-   - Node.js: 推荐版本 16.x 或以上
+   - Node.js: 20.19.x 或 22.12.x 以上
    - npm 或 yarn: 用于安装依赖
    - Git: 用于克隆项目
 
@@ -358,5 +390,3 @@ website/   # 网页前端
 ### 物品和流体图标、数据导出
 
 [https://github.com/RealSilverMoon/nesql-exporter/](https://github.com/RealSilverMoon/nesql-exporter/)
-
-

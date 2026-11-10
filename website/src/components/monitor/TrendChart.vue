@@ -555,9 +555,7 @@ export default {
 </style>
 
 <style>
-html.dark {
-    .trend-card {
-        background: none;
-    }
+html.dark .trend-card {
+    background: none;
 }
 </style>

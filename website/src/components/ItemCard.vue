@@ -16,7 +16,7 @@
         </el-image>
         <div style="width: calc(100% - 44px);">
             <p class="words">{{ item.title }}</p>
-            <p class="words">{{ item.name }}:{{ item.damage }}</p>
+            <p class="words">{{ item.name }}{{ item.damage == null ? '' : `:${item.damage}` }}</p>
         </div>
     </div>
 </template>
@@ -42,12 +42,12 @@ export default {
     methods: {
         updateItem(item) {
             const updatedItem = itemUtil.getItem(item);
-            if (item.name === "ae2fc:fluid_drop") {
-                item.image = itemUtil.getFluidIcon(data);
+            if (itemUtil.isFluid(item)) {
+                item.image = itemUtil.getFluidIcon(item);
             } else {
                 item.image = itemUtil.getItemIcon(updatedItem);
             }
-            item.title = itemUtil.getName(updatedItem, item, {}) || item.label;
+            item.title = itemUtil.getName(updatedItem, item, item) || item.label;
         }
     },
     created() {

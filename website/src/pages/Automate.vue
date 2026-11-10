@@ -102,6 +102,7 @@
                                 <ItemCard class="item-card-container" :item="{
                                     name: info.action.action_kwargs.item_name,
                                     damage: info.action.action_kwargs.item_damage,
+                                    stackType: info.action.action_kwargs.stack_type,
                                     amount: info.action.action_kwargs.item_amount,
                                     label: info.action.action_kwargs.label,
                                 }" />
@@ -852,9 +853,12 @@ export default {
         },
         onActionItemSelected(item) {
             this.form.action_kwargs.item_name = item.name;
-            this.form.action_kwargs.item_damage = item.damage;
+            this.form.action_kwargs.item_damage = item.damage ?? 0;
+            this.form.action_kwargs.stack_type = item.stackType || 'item';
             if (item.name === 'ae2fc:fluid_drop') {
                 this.form.action_kwargs.label = item.label;
+            } else {
+                this.form.action_kwargs.label = null;
             }
         },
         onLoadedItemList(itemList) {

@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from callback import *
 from action import *
 
-__version__ = "1.2.0"
+__version__ = "2.3.0"
 
 # 加载 .env 文件中的环境变量
 if os.path.exists('.env.dev'):
@@ -145,6 +145,12 @@ trigger_config = {
                         "description": "name",
                     },
                     {
+                        "field": "stack_type",
+                        "type": "str",
+                        "default": "item",
+                        "description": "AE2存储类型",
+                    },
+                    {
                         "field": "item_damage",
                         "type": "int",
                         "description": "damage",
@@ -240,6 +246,12 @@ timer_config = {
                         "description": "name",
                     },
                     {
+                        "field": "stack_type",
+                        "type": "str",
+                        "default": "item",
+                        "description": "AE2存储类型",
+                    },
+                    {
                         "field": "item_damage",
                         "type": "int",
                         "description": "damage",
@@ -292,6 +304,12 @@ timer_config = {
                         "field": "item_name",
                         "type": "str",
                         "description": "name",
+                    },
+                    {
+                        "field": "stack_type",
+                        "type": "str",
+                        "default": "item",
+                        "description": "AE2存储类型",
                     },
                     {
                         "field": "item_damage",

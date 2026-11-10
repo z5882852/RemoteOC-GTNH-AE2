@@ -1,7 +1,9 @@
 {
   "name": "remote-oc-gtnh-ae2-website",
   "private": true,
-  "version": "1.2.7",
+  "version": "2.3.0",
+  "license": "MIT",
+  "repository": "github:z5882852/RemoteOC-GTNH-AE2",
   "scripts": {
     "dev": "vite --port 80 --host 0.0.0.0",
     "build": "vite build",
@@ -11,17 +13,17 @@
     "@element-plus/icons-vue": "^2.3.1",
     "@vueuse/core": "^12.0.0",
     "axios": "^1.7.2",
-    "echarts": "^5.5.1",
+    "echarts": "^6.1.0",
     "element-plus": "^2.9.2",
     "pako": "^2.1.0",
     "vue": "^3.2.25",
-    "vue-echarts": "^7.0.3",
+    "vue-echarts": "^8.3.0",
     "vue-router": "4",
     "vue3-eventbus": "^2.0.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^2.3.3",
-    "vite": "^2.9.9",
+    "@vitejs/plugin-vue": "^6.0.9",
+    "vite": "^8.3.0",
     "vite-plugin-compression": "^0.5.1"
   }
 }

@@ -27,7 +27,7 @@
                 </el-image>
                 <div style="width: calc(100% - 44px);">
                     <p class="words">{{ item.title }}</p>
-                    <p class="words">{{ item.name }}:{{ item.damage }}</p>
+                    <p class="words">{{ item.name }}{{ item.damage == null ? '' : `:${item.damage}` }}</p>
                 </div>
             </div>
         </template>
@@ -122,8 +122,8 @@ export default {
                 // 遍历每个物品，添加 icon 和 title 属性
                 itemList.forEach(item => {
                     let item_ = itemUtil.getItem(item)
-                    item.icon = itemUtil.getItemIcon(item_);
-                    item.title = itemUtil.getName(item_, item, data) || item.label;
+                    item.icon = itemUtil.isFluid(item) ? itemUtil.getFluidIcon(item) : itemUtil.getItemIcon(item_);
+                    item.title = itemUtil.getName(item_, item, item) || item.label;
                 });
                 if (!this.options) {
                     this.itemList = itemList;
@@ -156,9 +156,9 @@ export default {
                     this.itemOptions = this.itemList;
                 }
                 if (this.type === 'items') {
-                    this.itemShowList = this.itemOptions.filter(item => item.name !== 'ae2fc:fluid_drop');
+                    this.itemShowList = this.itemOptions.filter(item => !itemUtil.isFluid(item));
                 } else if (this.type === 'fluids') {
-                    this.itemShowList = this.itemOptions.filter(item => item.name === 'ae2fc:fluid_drop');
+                    this.itemShowList = this.itemOptions.filter(item => itemUtil.isFluid(item));
                 } else {
                     this.itemShowList = this.itemOptions;
                 }

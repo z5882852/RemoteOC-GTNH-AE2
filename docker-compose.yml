@@ -1,26 +1,25 @@
-version: "3"
 services:
   roc-gtnh-frontend:
-    image: z5882852/roc-gtnh-frontend:latest
+    build:
+      context: ./website
     container_name: roc-gtnh-frontend
     # 如果开启https，请提供证书，将USE_HTTPS设置为true，将443端口映射到宿主机
     #volumes:
     #  - ./server.crt:/etc/nginx/etc/crt/server.crt
     #  - ./server.key:/etc/nginx/etc/crt/server.key
-    environment:
-      - SERVER_NAME=localhost # 域名或localhost(本地)
-      - USE_HTTPS=false
     ports:
       - "80:80"
       # - "443:443"
     restart: always
 
   roc-gtnh-backend:
-    image: z5882852/roc-gtnh-backend:latest
+    build:
+      context: ./server
     container_name: roc-gtnh-backend
     env_file:
-      - .env
+      - path: ./server/.env
+        required: false
     ports:
-      # 端口映射到宿主机，如果需要修改宿主机端口，请修改为"宿主机端口:1030"
-      - "8080:1030"
+      # 端口映射到宿主机，如果需要修改宿主机端口，请修改左侧端口
+      - "8080:8080"
     restart: always

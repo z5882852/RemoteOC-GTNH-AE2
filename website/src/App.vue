@@ -141,7 +141,7 @@ export default {
 
             const resourceUrl = Setting.get("resourceUrl");
             const useGzip = Setting.get("useGzip");
-            const version = itemUtil.version.replace(/\./g, "");
+            const version = itemUtil.getAssetVersionKey();
 
             // 加载 items 数据
             itemUtil.loadItems((percent) => {
