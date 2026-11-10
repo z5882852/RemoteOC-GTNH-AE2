@@ -116,19 +116,28 @@ website/   # 网页前端
      cd RemoteOC-GTNH-AE2/server
      ```
 
-3. **构建镜像**
+3. **配置认证令牌**
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    - 将 `.env` 中的 `SERVER_TOKEN` 替换为唯一的长随机令牌，并在 OC 客户端使用同一令牌
+    - `.env` 通过运行参数注入容器，不会打包进镜像
+
+4. **构建镜像**
 
     ```bash
     docker build -t roc-gtnh-backend .
     ```
 
-4. **运行容器**
+5. **运行容器**
 
     ```bash
-    docker run -d --name roc-gtnh-backend -p 8080:8080 roc-gtnh-backend
+    docker run -d --name roc-gtnh-backend --env-file .env -p 8080:8080 roc-gtnh-backend
     ```
 
-5. **查看日志**
+6. **查看日志**
 
     ```bash
     docker logs -f roc-gtnh-backend
