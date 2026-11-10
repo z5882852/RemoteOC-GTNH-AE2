@@ -162,12 +162,13 @@ end
 
 local function requestStack(stackType, details, amount, cpuName)
     local craftable
-    if stackType == ITEM_STACK and details.label then
-        -- Typed lookup ignores labels; fluid_drop variants share name and damage.
+    if stackType ~= ITEM_STACK or not details.label then
+        craftable = me.getCraftable(details, stackType)
+    end
+    if stackType == ITEM_STACK and not craftable then
+        -- Filtered lookup preserves labels and finds NBT outputs without a tag in details.
         local craftables = me.getCraftables(details)
         craftable = craftables and craftables[1]
-    else
-        craftable = me.getCraftable(details, stackType)
     end
 
     if not craftable then
